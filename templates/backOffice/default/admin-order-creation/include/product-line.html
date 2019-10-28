@@ -1,0 +1,152 @@
+<tr>
+    <td>
+        {form_field field='product_id' value_key=$key}
+        {if $orderProduct}
+            {loop type="product_sale_elements" name="product-sale-element-price-$key" id=$orderProduct->getProductSaleElementsId() currency=$currency_id backend_context=true}
+                {$product_id = $PRODUCT_ID}
+            {/loop}
+        {/if}
+        {$taxRuleId = null}
+        <div class="form-group">
+            <select class="form-control js-select-product" name="{$name}" data-placeholder="{intl l="Search..." d="adminordercreation.bo.default"}" data-url="{url path="/admin/admin-order-creation/ajax/search/product"}">
+                {if $product_id}
+                    {loop type="product" name="product-$key" id=$product_id visible="*" backend_context=true}
+                        {$taxRuleId = $TAX_RULE_ID}
+                        <option value="{$ID}">{$REF} : {$TITLE}</option>
+                    {/loop}
+                {/if}
+            </select>
+        </div>
+        {/form_field}
+        {form_field field='product_sale_element_id' value_key=$key}
+            <div class="form-group">
+                {if $product_id}
+                    {$attributeCombinations = []}
+                    {$PSE_first = null}
+                    {loop type="product_sale_elements" name="product-sale-element-$key" product=$product_id currency=$currency_id backend_context=true}
+                    {$PSE_id = $ID}
+                    {if !$PSE_first}
+                        {$PSE_first = $ID}
+                    {/if}
+                    {loop type="attribute_combination" name="attribute-combination-$key" product_sale_elements=$ID backend_context=true}
+                    {$attributeCombinations[$PSE_id][] = $ATTRIBUTE_TITLE|cat:' : '|cat:$ATTRIBUTE_AVAILABILITY_TITLE}
+                    {/loop}
+                    {/loop}
+
+                    {if $attributeCombinations|count}
+                        <select class="form-control js-select-product-sale-element" name="{$name}" >
+                            {loop type="product_sale_elements" name="product-sale-element-$key" product=$product_id currency=$currency_id}
+                            {$selected = false}
+                            {if !$orderProduct->getProductSaleElementsId() and $PSE_first == $ID}
+                                {$productSaleEmenetIdSelected = $ID}
+                                {$selected = true}
+                            {elseif $orderProduct->getProductSaleElementsId() == $ID}
+                                {$productSaleEmenetIdSelected = $ID}
+                                {$selected = true}
+                            {elseif $PSE_first == $ID}
+                                {$productSaleEmenetIdSelected = $ID}
+                                {$selected = true}
+                            {/if}
+
+                                <option {if $selected}selected{/if} data-quantity="{$QUANTITY}" data-ref="{$REF}" data-color="{if $QUANTITY > 0}#e6ffe6{else}#ffe6e6{/if}" value="{$ID}" >
+                                    {', '|implode:$attributeCombinations[$ID]}
+                                </option>
+                            {/loop}
+                        </select>
+                    {else}
+                        {intl l="Default product sale element" d="adminordercreation.bo.default"}
+
+                        {loop type="product_sale_elements" name="product-sale-element-$key" product=$product_id limit=1 currency=$currency_id backend_context=true}
+                        {$productSaleEmenetIdSelected = $ID}
+                            <input type="hidden" value="{$ID}" name="{$name}" />
+                        {/loop}
+                    {/if}
+                {/if}
+            </div>
+        {/form_field}
+    </td>
+    <td>
+        {if $product_id}
+            {if $productSaleEmenetIdSelected}
+
+                {loop type="product_sale_elements" name="product-sale-element-price-$key" id=$productSaleEmenetIdSelected currency=$currency_id backend_context=true}
+                    {form_field field='refresh_price' value_key=$key}
+                        <input class="js-refresh-price" type="hidden" name="{$name}" value="0" />
+                    {/form_field}
+
+                    {if $orderProduct->getWasInPromo()}
+                        {$priceWithoutTax = $orderProduct->getPromoPrice()}
+                    {else}
+                        {$priceWithoutTax = $orderProduct->getPrice()}
+                    {/if}
+
+                    {$taxes = 0}
+                    {foreach from=$orderProduct->getOrderProductTaxes() item=orderProductTax}
+                        {if $orderProduct->getWasInPromo()}
+                            {$taxes = $taxes + $orderProductTax->getPromoAmount()}
+                        {else}
+                            {$taxes = $taxes + $orderProductTax->getAmount()}
+                        {/if}
+                    {/foreach}
+
+                    {form_field field='product_price_without_tax' value_key=$key}
+                    <div class="form-group">
+                        <div class="input-group">
+                            <input class="form-control js-product-price-without-tax" data-tax-rule-id="{$taxRuleId}"
+                                   data-url="{url path="/admin/product/calculate-raw-price?action=to_tax"}"
+                                   type="number" min="0" step="0.000001" name="{$name}" value="{format_number number=$priceWithoutTax dec_point="." decimals="6"}" />
+                            <div class="input-group-addon">HT</div>
+                        </div>
+                    </div>
+                    {/form_field}
+
+                    {form_field field='product_price_with_tax' value_key=$key}
+                    <div class="form-group">
+                        <div class="input-group">
+                            <input class="form-control js-product-price-with-tax" data-tax-rule-id="{$taxRuleId}"
+                                   data-url="{url path="/admin/product/calculate-raw-price?action=from_tax"}"
+                                   type="number" min="0" step="0.000001" name="{$name}" value="{format_number number=($priceWithoutTax + $taxes) dec_point="." decimals="6"}" />
+                            <div class="input-group-addon">TTC</div>
+                        </div>
+                    </div>
+                    {/form_field}
+                {/loop}
+            {/if}
+        {/if}
+    </td>
+    <td>
+        {form_field field='product_quantity' value_key=$key}
+            <div class="form-group">
+                {if $product_id}
+                    {loop type="product_sale_elements" name="product-sale-element-quanaity-$key" id=$productSaleEmenetIdSelected currency=$currency_id backend_context=true}
+                        <input class="form-control js-action-refresh" type="number" min="1" step="1"  name="{$name}" value="{$orderProduct->getQuantity()}" />
+                    {/loop}
+                {/if}
+            </div>
+        {/form_field}
+    </td>
+    <td>
+        {if $productSaleEmenetIdSelected}
+        {loop type="product_sale_elements" name="product-sale-element-price-$key" id=$productSaleEmenetIdSelected currency=$currency_id backend_context=true}
+            <div class="form-group">
+                <div class="input-group">
+                    <input class="form-control js-action-refresh" type="number" min="0" step="0.000001" disabled value="{format_number number=($priceWithoutTax * $orderProduct->getQuantity()) dec_point="." decimals="6"}" />
+                    <div class="input-group-addon">HT</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="input-group">
+                    <input class="form-control js-action-refresh" type="number" min="0" step="0.000001" disabled value="{format_number number=(($priceWithoutTax + $taxes) * $orderProduct->getQuantity()) dec_point="." decimals="6"}" />
+                    <div class="input-group-addon">TTC</div>
+                </div>
+            </div>
+        {/loop}
+        {/if}
+    </td>
+    <td>
+        <button class="btn btn-danger js-action-delete" title="{intl l="Delete" d="adminordercreation.bo.default"}">
+            <span class="glyphicon glyphicon-trash"></span>
+        </button>
+    </td>
+</tr>
