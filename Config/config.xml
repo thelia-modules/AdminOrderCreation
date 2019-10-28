@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<config xmlns="http://thelia.net/schema/dic/config"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://thelia.net/schema/dic/config http://thelia.net/schema/dic/config/thelia-1.0.xsd">
+
+    <forms>
+        <form name="admin-order-creation.create" class="AdminOrderCreation\Form\OrderCreateForm" />
+    </forms>
+
+    <hooks>
+        <hook id="adminordercreation.hook.back.order" class="AdminOrderCreation\Hook\Back\OrderHook">
+            <tag name="hook.event_listener" event="orders.table-header" type="back" method="onOrdersTableHeader" />
+            <tag name="hook.event_listener" event="orders.js" type="back" method="onOrderJs" />
+        </hook>
+        <hook id="adminordercreation.hook.back.order.edit" class="AdminOrderCreation\Hook\Back\OrderEditHook">
+            <tag name="hook.event_listener" event="order.edit-js" type="back" method="onOrderAddButtonJs" />
+            <tag name="hook.event_listener" event="order.edit-js" type="back" method="onOrderJs" />
+        </hook>
+    </hooks>
+</config>
