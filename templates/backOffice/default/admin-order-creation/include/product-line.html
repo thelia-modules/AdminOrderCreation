@@ -2,7 +2,7 @@
     <td>
         {form_field field='product_id' value_key=$key}
         {if $orderProduct}
-            {loop type="product_sale_elements" name="product-sale-element-price-$key" id=$orderProduct->getProductSaleElementsId() currency=$currency_id backend_context=true}
+            {loop type="product_sale_elements" order="id" name="product-sale-element-price-$key" id=$orderProduct->getProductSaleElementsId() currency=$currency_id backend_context=true}
                 {$product_id = $PRODUCT_ID}
             {/loop}
         {/if}
@@ -23,7 +23,7 @@
                 {if $product_id}
                     {$attributeCombinations = []}
                     {$PSE_first = null}
-                    {loop type="product_sale_elements" name="product-sale-element-$key" product=$product_id currency=$currency_id backend_context=true}
+                    {loop type="product_sale_elements" order="id" name="product-sale-element-$key" product=$product_id currency=$currency_id backend_context=true}
                     {$PSE_id = $ID}
                     {if !$PSE_first}
                         {$PSE_first = $ID}
@@ -35,7 +35,7 @@
 
                     {if $attributeCombinations|count}
                         <select class="form-control js-select-product-sale-element" name="{$name}" >
-                            {loop type="product_sale_elements" name="product-sale-element-$key" product=$product_id currency=$currency_id}
+                            {loop type="product_sale_elements" order="id" name="product-sale-element-$key" product=$product_id currency=$currency_id}
                             {$selected = false}
                             {if !$orderProduct->getProductSaleElementsId() and $PSE_first == $ID}
                                 {$productSaleEmenetIdSelected = $ID}
@@ -56,7 +56,7 @@
                     {else}
                         {intl l="Default product sale element" d="adminordercreation.bo.default"}
 
-                        {loop type="product_sale_elements" name="product-sale-element-$key" product=$product_id limit=1 currency=$currency_id backend_context=true}
+                        {loop type="product_sale_elements" order="id" name="product-sale-element-$key" product=$product_id limit=1 currency=$currency_id backend_context=true}
                         {$productSaleEmenetIdSelected = $ID}
                             <input type="hidden" value="{$ID}" name="{$name}" />
                         {/loop}
@@ -69,7 +69,7 @@
         {if $product_id}
             {if $productSaleEmenetIdSelected}
 
-                {loop type="product_sale_elements" name="product-sale-element-price-$key" id=$productSaleEmenetIdSelected currency=$currency_id backend_context=true}
+                {loop type="product_sale_elements" order="id" name="product-sale-element-price-$key" id=$productSaleEmenetIdSelected currency=$currency_id backend_context=true}
                     {form_field field='refresh_price' value_key=$key}
                         <input class="js-refresh-price" type="hidden" name="{$name}" value="0" />
                     {/form_field}
@@ -118,7 +118,7 @@
         {form_field field='product_quantity' value_key=$key}
             <div class="form-group">
                 {if $product_id}
-                    {loop type="product_sale_elements" name="product-sale-element-quanaity-$key" id=$productSaleEmenetIdSelected currency=$currency_id backend_context=true}
+                    {loop type="product_sale_elements" order="id" name="product-sale-element-quanaity-$key" id=$productSaleEmenetIdSelected currency=$currency_id backend_context=true}
                         <input class="form-control js-action-refresh" type="number" min="1" step="1"  name="{$name}" value="{$orderProduct->getQuantity()}" />
                     {/loop}
                 {/if}
@@ -127,7 +127,7 @@
     </td>
     <td>
         {if $productSaleEmenetIdSelected}
-        {loop type="product_sale_elements" name="product-sale-element-price-$key" id=$productSaleEmenetIdSelected currency=$currency_id backend_context=true}
+        {loop type="product_sale_elements" order="id" name="product-sale-element-price-$key" id=$productSaleEmenetIdSelected currency=$currency_id backend_context=true}
             <div class="form-group">
                 <div class="input-group">
                     <input class="form-control js-action-refresh" type="number" min="0" step="0.000001" disabled value="{format_number number=($priceWithoutTax * $orderProduct->getQuantity()) dec_point="." decimals="6"}" />
