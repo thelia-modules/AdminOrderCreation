@@ -2,7 +2,7 @@
 
 Author: Gilles Bourgeat <gilles.bourgeat@gmail.com>
 
-* odule for generate an order from the back office
+A module to create orders from the Thelia back-office.
 
 ## Compatibility
 
