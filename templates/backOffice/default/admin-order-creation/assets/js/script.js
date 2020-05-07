@@ -251,14 +251,14 @@
             }));
         });
 
-        $form.on('keyup change', '.js-action-refresh', function(event){
+        $form.on('change', '.js-action-refresh', function(event){
             if ($(this).val().length) {
                 refreshWithTimer($form, event);
             }
         });
 
         var currentProductRequestTax;
-        $form.on('keyup', '.js-product-price-with-tax, .js-product-price-without-tax', function(event){
+        $form.on('change', '.js-product-price-with-tax, .js-product-price-without-tax', function(event){
             if (currentProductRequestTax) currentProductRequestTax.abort();
 
             var $th = $(this), $thr = $(this).parents('tr');
@@ -335,7 +335,7 @@
         var $shippingArea = $form.find('.js-shipping-area');
 
         var currentRequestTax;
-        $shippingArea.on('keyup', '.js-field-amount-without-tax, .js-field-amount-with-tax', function(event){
+        $shippingArea.on('change', '.js-field-amount-without-tax, .js-field-amount-with-tax', function(event){
             if (currentRequestTax) currentRequestTax.abort();
 
             var $th = $(this), $thr = $shippingArea;
