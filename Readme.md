@@ -20,5 +20,5 @@ Thelia >= 2.3
 Add it in your main thelia composer.json file
 
 ```
-composer require thelia/admin-order-creation:~1.3.1
+composer require thelia/admin-order-creation ~1.3.3
 ```
