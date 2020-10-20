@@ -1,9 +1,11 @@
 {
   "name": "thelia/admin-order-creation",
+  "description": "A module to create orders from the Thelia back-office.",
   "license": "MIT",
   "type": "thelia-module",
   "require": {
-    "thelia/installer": "~1.1"
+    "thelia/installer": "~1.1",
+    "thelia/credit-note-module": "~2.3.0"
   },
   "extra": {
     "installer-name": "AdminOrderCreation"
