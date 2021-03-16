@@ -192,6 +192,7 @@ class OrderController extends BaseAdminController
             ->limit(20);
 
         $this->whereConcatRegex($customerQuery, [
+            'customer.REF',
             'customer.FIRSTNAME',
             'customer.LASTNAME',
             'customer.EMAIL',
