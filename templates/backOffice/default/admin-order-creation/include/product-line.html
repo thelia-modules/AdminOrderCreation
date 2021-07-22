@@ -1,7 +1,7 @@
 <tr>
     <td>
         {form_field field='product_id' value_key=$key}
-        {if $orderProduct}
+        {if $orderProduct|default:null}
             {loop type="product_sale_elements" order="id" name="product-sale-element-price-$key" id=$orderProduct->getProductSaleElementsId() currency=$currency_id backend_context=true}
                 {$product_id = $PRODUCT_ID}
             {/loop}
@@ -9,7 +9,7 @@
         {$taxRuleId = null}
         <div class="form-group">
             <select class="form-control js-select-product" name="{$name}" data-placeholder="{intl l="Search..." d="adminordercreation.bo.default"}" data-url="{url path="/admin/admin-order-creation/ajax/search/product"}">
-                {if $product_id}
+                {if $product_id|default:null}
                     {loop type="product" name="product-$key" id=$product_id visible="*" backend_context=true}
                         {$taxRuleId = $TAX_RULE_ID}
                         <option value="{$ID}">{$REF} : {$TITLE}</option>
@@ -20,7 +20,7 @@
         {/form_field}
         {form_field field='product_sale_element_id' value_key=$key}
             <div class="form-group">
-                {if $product_id}
+                {if $product_id|default:null}
                     {$attributeCombinations = []}
                     {$PSE_first = null}
                     {loop type="product_sale_elements" order="id" name="product-sale-element-$key" product=$product_id currency=$currency_id backend_context=true}
@@ -66,8 +66,8 @@
         {/form_field}
     </td>
     <td>
-        {if $product_id}
-            {if $productSaleEmenetIdSelected}
+        {if $product_id|default:null}
+            {if $productSaleEmenetIdSelected|default:null}
 
                 {loop type="product_sale_elements" order="id" name="product-sale-element-price-$key" id=$productSaleEmenetIdSelected currency=$currency_id backend_context=true}
                     {form_field field='refresh_price' value_key=$key}
@@ -117,8 +117,8 @@
     <td>
         {form_field field='product_quantity' value_key=$key}
             <div class="form-group">
-                {if $product_id}
-                    {loop type="product_sale_elements" order="id" name="product-sale-element-quanaity-$key" id=$productSaleEmenetIdSelected currency=$currency_id backend_context=true}
+                {if $product_id|default:null}
+                    {loop type="product_sale_elements" order="id" name="product-sale-element-quanaity-$key" id=$productSaleEmenetIdSelected|default:null currency=$currency_id backend_context=true}
                         <input class="form-control js-action-refresh" type="number" min="1" step="1"  name="{$name}" value="{$orderProduct->getQuantity()}" />
                     {/loop}
                 {/if}
@@ -126,7 +126,7 @@
         {/form_field}
     </td>
     <td>
-        {if $productSaleEmenetIdSelected}
+        {if $productSaleEmenetIdSelected|default:null}
         {loop type="product_sale_elements" order="id" name="product-sale-element-price-$key" id=$productSaleEmenetIdSelected currency=$currency_id backend_context=true}
             <div class="form-group">
                 <div class="input-group">

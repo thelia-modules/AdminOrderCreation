@@ -30,7 +30,7 @@ class Order extends \Thelia\Model\Order
             }
         }
 
-        $total += $this->getPostage();
+        $total += (float)$this->getPostage();
 
 
         if ($withDiscount) {
@@ -52,7 +52,7 @@ class Order extends \Thelia\Model\Order
             }
         }
 
-        $total += $this->getPostage() - $this->getPostageTax();
+        $total += (float)$this->getPostage() - $this->getPostageTax();
 
         if ($withDiscount) {
             $total -= $this->getDiscount();
