@@ -9,6 +9,7 @@
 namespace AdminOrderCreation\Controller;
 
 use AdminOrderCreation\AdminOrderCreation;
+use AdminOrderCreation\Form\OrderCreateForm;
 use AdminOrderCreation\Util\Calc;
 use AdminOrderCreation\Util\CriteriaSearchTrait;
 use CreditNote\Model\CreditNote;
@@ -21,16 +22,22 @@ use CreditNote\Model\OrderCreditNote;
 use InvoiceRef\EventListeners\OrderListener;
 use Propel\Runtime\ActiveRecord\ActiveRecordInterface;
 use Propel\Runtime\Propel;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\Form\Extension\Core\Type\FormType;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Thelia\Controller\Admin\BaseAdminController;
 use Thelia\Core\Event\Order\OrderEvent;
 use Thelia\Core\Event\TheliaEvents;
 use Thelia\Core\HttpFoundation\Request;
 use Thelia\Core\Security\AccessManager;
 use Thelia\Core\Security\Resource\AdminResources;
+use Thelia\Core\Security\SecurityContext;
 use Thelia\Core\Template\Loop\ProductSaleElements;
+use Thelia\Core\Template\ParserContext;
+use Thelia\Core\Translation\Translator;
 use Thelia\Model\AddressQuery;
 use Thelia\Model\Cart;
 use Thelia\Model\CountryQuery;
@@ -54,12 +61,19 @@ use Thelia\Model\ProductSaleElementsQuery;
 use Thelia\Model\TaxRuleI18n;
 use Thelia\Tools\I18n;
 use Thelia\Tools\URL;
+use Symfony\Component\Routing\Annotation\Route;
 
+/**
+ * @Route("/admin/admin-order-creation/ajax", name="admin_order_creation_ajax")
+ */
 class OrderController extends BaseAdminController
 {
     use CriteriaSearchTrait;
 
-    public function ajaxModalCreateAction(Request $request)
+    /**
+     * @Route("/modal/create", name="_create", methods="POST")
+     */
+    public function ajaxModalCreateAction(Request $request, ParserContext $parserContext, EventDispatcherInterface $eventDispatcher, RequestStack $requestStack, SecurityContext $securityContext)
     {
         if (null !== $response = $this->checkAuth(AdminResources::ORDER, [], AccessManager::CREATE)) {
             return $response;
@@ -69,15 +83,13 @@ class OrderController extends BaseAdminController
 
         $order->setLang($this->getLang());
 
-        $order->setDispatcher($this->getDispatcher());
-
-        $form = $this->createForm('admin-order-creation.create', 'form', [], ['csrf_protection' => false]);
+        $form = $this->createForm(OrderCreateForm::getName(), FormType::class, [], ['csrf_protection' => false]);
 
         $formValidate = $this->validateForm($form, 'post');
 
-        $this->performOrder($order, $formValidate);
+        $this->performOrder($order, $formValidate, $eventDispatcher, $requestStack, $securityContext);
 
-        $this->getParserContext()->addForm($form);
+        $parserContext->addForm($form);
 
         $errorMessage = [];
         foreach ($formValidate->getErrors() as $error) {
@@ -120,9 +132,9 @@ class OrderController extends BaseAdminController
                             OrderStatusQuery::create()->findOneById(2)
                         );
 
-                        $this->getDispatcher()->dispatch(
-                            TheliaEvents::ORDER_UPDATE_STATUS,
-                            (new OrderEvent($order))->setStatus(2)
+                        $eventDispatcher->dispatch(
+                            (new OrderEvent($order))->setStatus(2),
+                            TheliaEvents::ORDER_UPDATE_STATUS
                         );
 
                         $order->save();
@@ -145,9 +157,9 @@ class OrderController extends BaseAdminController
                     $order->setOrderStatus(
                         OrderStatusQuery::create()->findOneById((int) $orderStatusId)
                     );
-                    $this->getDispatcher()->dispatch(
-                        TheliaEvents::ORDER_UPDATE_STATUS,
-                        (new OrderEvent($order))->setStatus((int) $orderStatusId)
+                    $eventDispatcher->dispatch(
+                        (new OrderEvent($order))->setStatus((int) $orderStatusId),
+                        TheliaEvents::ORDER_UPDATE_STATUS
                     );
                 }
 
@@ -179,8 +191,9 @@ class OrderController extends BaseAdminController
      * @param Request $request
      * @return JsonResponse
      * @throws \Propel\Runtime\Exception\PropelException
+     * @Route("/search/customer", name="_customer", methods="GET")
      */
-    public function ajaxSearchCustomerAction(Request $request)
+    public function ajaxSearchCustomerAction(RequestStack $requestStack)
     {
         if (null !== $response = $this->checkAuth(AdminResources::ORDER, [], AccessManager::CREATE)) {
             return $response;
@@ -198,7 +211,7 @@ class OrderController extends BaseAdminController
             'customer.EMAIL',
             'address.COMPANY',
             'address.PHONE'
-        ], $request->get('q'));
+        ], $requestStack->getCurrentRequest()->get('q'));
 
         $customerQuery
             ->withColumn(AddressTableMap::COMPANY, 'COMPANY')
@@ -233,8 +246,9 @@ class OrderController extends BaseAdminController
      * @param Request $request
      * @return JsonResponse
      * @throws \Propel\Runtime\Exception\PropelException
+     * @Route("/search/product", name="_product", methods="GET")
      */
-    public function ajaxSearchProductAction(Request $request)
+    public function ajaxSearchProductAction(RequestStack $requestStack)
     {
         if (null !== $response = $this->checkAuth(AdminResources::ORDER, [], AccessManager::CREATE)) {
             return $response;
@@ -243,16 +257,16 @@ class OrderController extends BaseAdminController
         $productQuery = ProductQuery::create();
 
         $productQuery->useI18nQuery(
-            $this->getRequest()->getSession()->getAdminEditionLang()->getLocale()
+            $requestStack->getCurrentRequest()->getSession()->getAdminEditionLang()->getLocale()
         );
 
         $productQuery
-            ->withColumn(ProductI18nTableMap::TITLE, 'TITLE');
+            ->withColumn(ProductI18nTableMap::COL_TITLE, 'TITLE');
 
         $this->whereConcatRegex($productQuery, array(
             'product.REF',
             'product_i18n.TITLE'
-        ), $request->get('q'));
+        ), $requestStack->getCurrentRequest()->get('q'));
 
         $productQuery->setLimit(10);
 
@@ -280,7 +294,7 @@ class OrderController extends BaseAdminController
         return class_exists('\CreditNote\CreditNote');
     }
 
-    protected function performOrder(Order $order, Form $formValidate)
+    protected function performOrder(Order $order, Form $formValidate, EventDispatcherInterface $eventDispatcher, RequestStack $requestStack, SecurityContext $securityContext)
     {
         $this
             ->performCurrency($order, $formValidate)
@@ -289,7 +303,7 @@ class OrderController extends BaseAdminController
             ->performInvoiceAddress($order, $formValidate)
             ->performDeliveryAddress($order, $formValidate)
             ->performDeliveryAddress($order, $formValidate)
-            ->performProducts($order, $formValidate)
+            ->performProducts($order, $formValidate, $eventDispatcher, $requestStack, $securityContext)
             ->performShipping($order, $formValidate)
             ->performGlobalReduction($order, $formValidate)
             ->performPaymentModule($order, $formValidate)
@@ -622,7 +636,7 @@ class OrderController extends BaseAdminController
         return $this->getSession()->getAdminEditionLang();
     }
 
-    protected function performProducts(Order $order, Form $form)
+    protected function performProducts(Order $order, Form $form, EventDispatcherInterface $eventDispatcher, RequestStack $requestStack, SecurityContext $securityContext)
     {
         $country = $this->getCountry($form);
 
@@ -648,7 +662,7 @@ class OrderController extends BaseAdminController
                 $product->getId()
             );
 
-            $productSaleElementsLoop = new ProductSaleElements($this->container);
+            $productSaleElementsLoop = new ProductSaleElements($this->container, $requestStack, $eventDispatcher, $securityContext, Translator::getInstance(), [], "" );
 
             if (isset($productSaleElementIds[$key])) {
                 if (null !== ProductSaleElementsQuery::create()
@@ -722,7 +736,6 @@ class OrderController extends BaseAdminController
                 ->setTaxRuleTitle($taxRuleI18n->getTitle())
                 ->setTaxRuleDescription($taxRuleI18n->getDescription())
                 ->setEanCode($productSaleElement->getEanCode())
-                ->setDispatcher($this->getDispatcher())
                 ->setPrice($price)
                 ->setPromoPrice($promoPrice)
                 ->setWasInPromo($productSaleElement->getPromo())
@@ -736,14 +749,14 @@ class OrderController extends BaseAdminController
             foreach ($productSaleElement->getAttributeCombinations() as $attributeCombination) {
                 /** @var \Thelia\Model\Attribute $attribute */
                 $attribute = I18n::forceI18nRetrieving(
-                    $this->getSession()->getLang()->getLocale(),
+                    $requestStack->getCurrentRequest()->getSession()->getLang()->getLocale(),
                     'Attribute',
                     $attributeCombination->getAttributeId()
                 );
 
                 /** @var \Thelia\Model\AttributeAv $attributeAv */
                 $attributeAv = I18n::forceI18nRetrieving(
-                    $this->getSession()->getLang()->getLocale(),
+                    $requestStack->getCurrentRequest()->getSession()->getLang()->getLocale(),
                     'AttributeAv',
                     $attributeCombination->getAttributeAvId()
                 );

@@ -9,6 +9,7 @@
 namespace AdminOrderCreation\Form;
 
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
+use Symfony\Component\Form\Extension\Core\Type\CollectionType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -24,7 +25,7 @@ class OrderCreateForm extends BaseForm
     /**
      * @return string the name of you form. This name must be unique
      */
-    public function getName()
+    public static function getName()
     {
         return 'admin-order-creation-create';
     }
@@ -135,32 +136,32 @@ class OrderCreateForm extends BaseForm
         ;
 
         $this->formBuilder
-            ->add('product_id', 'collection', array(
+            ->add('product_id', CollectionType::class, array(
                 'required' => false,
                 'allow_add'    => true,
                 'allow_delete' => true
             ))
-            ->add('product_sale_element_id', 'collection', array(
+            ->add('product_sale_element_id', CollectionType::class, array(
                 'required' => false,
                 'allow_add'    => true,
                 'allow_delete' => true
             ))
-            ->add('product_quantity', 'collection', array(
+            ->add('product_quantity', CollectionType::class, array(
                 'required' => false,
                 'allow_add'    => true,
                 'allow_delete' => true
             ))
-            ->add('product_price_with_tax', 'collection', array(
+            ->add('product_price_with_tax', CollectionType::class, array(
                 'required' => false,
                 'allow_add'    => true,
                 'allow_delete' => true
             ))
-            ->add('product_price_without_tax', 'collection', array(
+            ->add('product_price_without_tax', CollectionType::class, array(
                 'required' => false,
                 'allow_add'    => true,
                 'allow_delete' => true
             ))
-            ->add('refresh_price', 'collection', array(
+            ->add('refresh_price', CollectionType::class, array(
                 'required' => false,
                 'allow_add'    => true,
                 'allow_delete' => true

@@ -9,6 +9,7 @@
 namespace AdminOrderCreation;
 
 use Propel\Runtime\Connection\ConnectionInterface;
+use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
 use Thelia\Model\ModuleQuery;
 use Thelia\Module\BaseModule;
 
@@ -28,7 +29,7 @@ class AdminOrderCreation extends BaseModule
     const CONFIG_DEFAULT_VALUE_PAYED_ORDER_MINIMUM_STATUS_ID = 2;
     const CONFIG_DEFAULT_VALUE_INVOICE_REF_TYPE = 0;
 
-    public function update($currentVersion, $newVersion, ConnectionInterface $con = null)
+    public function update($currentVersion, $newVersion, ConnectionInterface $con = null): void
     {
         if (null === self::getConfigValue(self::CONFIG_KEY_DEFAULT_NEW_CREDIT_NOTE_STATUS_ID)) {
             self::setConfigValue(
@@ -65,4 +66,13 @@ class AdminOrderCreation extends BaseModule
             );
         }
     }
+
+    public static function configureServices(ServicesConfigurator $servicesConfigurator): void
+    {
+        $servicesConfigurator->load(self::getModuleCode().'\\', __DIR__)
+            ->exclude([THELIA_MODULE_DIR . ucfirst(self::getModuleCode()). "/I18n/*"])
+            ->autowire(true)
+            ->autoconfigure(true);
+    }
+
 }
