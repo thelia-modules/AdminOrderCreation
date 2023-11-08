@@ -663,6 +663,7 @@ class OrderController extends BaseAdminController
             );
 
             $productSaleElementsLoop = new ProductSaleElements($this->container, $requestStack, $eventDispatcher, $securityContext, Translator::getInstance(), [], "" );
+            $productSaleElementsLoop->init($this->container, $requestStack, $eventDispatcher, $securityContext, Translator::getInstance(), [], "");
 
             if (isset($productSaleElementIds[$key])) {
                 if (null !== ProductSaleElementsQuery::create()
