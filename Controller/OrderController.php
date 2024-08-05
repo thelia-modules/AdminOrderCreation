@@ -530,7 +530,10 @@ class OrderController extends BaseAdminController
                 ->setCity($address->getCity())
                 ->setZipcode($address->getZipcode())
                 ->setCompany($address->getCompany())
-                ->setCountry($address->getCountry());
+                ->setCountry($address->getCountry())
+                ->setPhone($address->getPhone())
+                ->setCellphone($address->getCellphone())
+            ;
         } else {
             $invoiceAddressTitle = $form->get('invoice_address_title')->getData();
             $invoiceAddressFirstname = $form->get('invoice_address_firstname')->getData();
@@ -541,6 +544,8 @@ class OrderController extends BaseAdminController
             $invoiceAddressZipcode = $form->get('invoice_address_zipcode')->getData();
             $invoiceAddressCity = $form->get('invoice_address_city')->getData();
             $invoiceAddressCountryId = $form->get('invoice_address_country_id')->getData();
+            $invoiceAddressPhone = $form->get('invoice_address_phone')->getData();
+            $invoiceAddressCellphone = $form->get('invoice_address_cellphone')->getData();
 
             $orderAddress = (new OrderAddress())
                 ->setCustomerTitleId($invoiceAddressTitle)
@@ -553,7 +558,10 @@ class OrderController extends BaseAdminController
                 ->setCompany($invoiceAddressCompany)
                 ->setCountry(
                     CountryQuery::create()->findOneById($invoiceAddressCountryId)
-                );
+                )
+                ->setPhone($invoiceAddressPhone)
+                ->setCellphone($invoiceAddressCellphone)
+            ;
         }
 
         if (empty($orderAddress->getLastname()) && 'create' === $form->get('action')->getData()) {
@@ -590,7 +598,10 @@ class OrderController extends BaseAdminController
                 ->setCity($address->getCity())
                 ->setZipcode($address->getZipcode())
                 ->setCompany($address->getCompany())
-                ->setCountry($address->getCountry());
+                ->setCountry($address->getCountry())
+                ->setPhone($address->getPhone())
+                ->setCellphone($address->getCellphone())
+            ;
         } else {
             $deliveryAddressTitle = $form->get('delivery_address_title')->getData();
             $deliveryAddressFirstname = $form->get('delivery_address_firstname')->getData();
@@ -601,6 +612,8 @@ class OrderController extends BaseAdminController
             $deliveryAddressZipcode = $form->get('delivery_address_zipcode')->getData();
             $deliveryAddressCity = $form->get('delivery_address_city')->getData();
             $deliveryAddressCountryId = $form->get('delivery_address_country_id')->getData();
+            $deliveryAddressPhone = $form->get('delivery_address_phone')->getData();
+            $deliveryAddressCellphone = $form->get('delivery_address_cellphone')->getData();
 
             $orderAddress = (new OrderAddress())
                 ->setCustomerTitleId($deliveryAddressTitle)
@@ -613,7 +626,10 @@ class OrderController extends BaseAdminController
                 ->setCompany($deliveryAddressCompany)
                 ->setCountry(
                     CountryQuery::create()->findOneById($deliveryAddressCountryId)
-                );
+                )
+                ->setPhone($deliveryAddressPhone)
+                ->setCellphone($deliveryAddressCellphone)
+            ;
         }
 
         if (empty($orderAddress->getLastname()) && 'create' === $form->get('action')->getData()) {
