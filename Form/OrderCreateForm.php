@@ -100,9 +100,6 @@ class OrderCreateForm extends BaseForm
             ->add('invoice_address_country_id', IntegerType::class, array(
                 'required' => false
             ))
-            ->add('invoice_address_city', TextType::class, array(
-                'required' => false
-            ))
             ->add('invoice_address_phone', TextType::class, array(
                 'required' => false
             ))
