@@ -219,6 +219,18 @@
                                 <input type="text" name="{$name}" class="form-control" value="{$data}" />
                             </div>
                         {/form_field}
+                        {form_field field='invoice_address_phone'}
+                        <div class="form-group col-md-6">
+                            <label for="">{intl l="Phone number :" d="adminordercreation.bo.default"}</label>
+                            <input type="text" name="{$name}" class="form-control" value="{$data}" />
+                        </div>
+                        {/form_field}
+                        {form_field field='invoice_address_cellphone'}
+                        <div class="form-group col-md-6">
+                            <label for="">{intl l="Cellphone number :" d="adminordercreation.bo.default"}</label>
+                            <input type="text" name="{$name}" class="form-control" value="{$data}" />
+                        </div>
+                        {/form_field}
                     </div>
 
                 </div>
@@ -318,6 +330,18 @@
                         {form_field field='delivery_address_company'}
                         <div class="form-group col-md-6">
                             <label for="">{intl l="Company :" d="adminordercreation.bo.default"}</label>
+                            <input type="text" name="{$name}" class="form-control" value="{$data}"/>
+                        </div>
+                        {/form_field}
+                        {form_field field='delivery_address_phone'}
+                        <div class="form-group col-md-6">
+                            <label for="">{intl l="Phone number :" d="adminordercreation.bo.default"}</label>
+                            <input type="text" name="{$name}" class="form-control" value="{$data}"/>
+                        </div>
+                        {/form_field}
+                        {form_field field='delivery_address_cellphone'}
+                        <div class="form-group col-md-6">
+                            <label for="">{intl l="Cellphone number :" d="adminordercreation.bo.default"}</label>
                             <input type="text" name="{$name}" class="form-control" value="{$data}"/>
                         </div>
                         {/form_field}

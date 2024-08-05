@@ -58,4 +58,6 @@ return array(
     'Value :' => 'Value :',
     'Your customer will have to pay the difference of %amount with tax' => 'Votre client devra payer la différence d\'un montant de %amount TTC',
     'Zipcode :' => 'Code postal :',
+    'Phone number :' => 'Numéro de téléphone :',
+    'Cellphone number :' => 'Numéro de portable :',
 );
