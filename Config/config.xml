@@ -10,7 +10,7 @@
 
     <hooks>
         <hook id="adminordercreation.hook.back.order" class="AdminOrderCreation\Hook\Back\OrderHook">
-            <tag name="hook.event_listener" event="orders.table-header" type="back" method="onOrdersTableHeader" />
+            <tag name="hook.event_listener" event="orders.top" type="back" method="onOrdersTableHeader" />
             <tag name="hook.event_listener" event="orders.js" type="back" method="onOrderJs" />
         </hook>
         <hook id="adminordercreation.hook.back.order.edit" class="AdminOrderCreation\Hook\Back\OrderEditHook">

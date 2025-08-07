@@ -22,6 +22,7 @@ use CreditNote\Model\OrderCreditNote;
 use InvoiceRef\EventListeners\OrderListener;
 use Propel\Runtime\ActiveRecord\ActiveRecordInterface;
 use Propel\Runtime\Propel;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Form\Extension\Core\Type\FormType;
 use Symfony\Component\Form\FormError;
@@ -59,6 +60,7 @@ use Thelia\Model\ProductI18n;
 use Thelia\Model\ProductQuery;
 use Thelia\Model\ProductSaleElementsQuery;
 use Thelia\Model\TaxRuleI18n;
+use Thelia\TaxEngine\TaxEngine;
 use Thelia\Tools\I18n;
 use Thelia\Tools\URL;
 use Symfony\Component\Routing\Annotation\Route;
@@ -73,7 +75,15 @@ class OrderController extends BaseAdminController
     /**
      * @Route("/modal/create", name="_create", methods="POST")
      */
-    public function ajaxModalCreateAction(Request $request, ParserContext $parserContext, EventDispatcherInterface $eventDispatcher, RequestStack $requestStack, SecurityContext $securityContext)
+    public function ajaxModalCreateAction(
+        Request $request,
+        ParserContext $parserContext,
+        EventDispatcherInterface $eventDispatcher,
+        RequestStack $requestStack,
+        SecurityContext $securityContext,
+        #[Autowire(service: TaxEngine::class)]
+        TaxEngine $taxEngine
+    )
     {
         if (null !== $response = $this->checkAuth(AdminResources::ORDER, [], AccessManager::CREATE)) {
             return $response;
@@ -87,7 +97,7 @@ class OrderController extends BaseAdminController
 
         $formValidate = $this->validateForm($form, 'post');
 
-        $this->performOrder($order, $formValidate, $eventDispatcher, $requestStack, $securityContext);
+        $this->performOrder($order, $formValidate, $eventDispatcher, $requestStack, $securityContext, $taxEngine);
 
         $parserContext->addForm($form);
 
@@ -214,11 +224,11 @@ class OrderController extends BaseAdminController
         ], $requestStack->getCurrentRequest()->get('q'));
 
         $customerQuery
-            ->withColumn(AddressTableMap::COMPANY, 'COMPANY')
-            ->withColumn(AddressTableMap::ADDRESS1, 'ADDRESS')
-            ->withColumn(AddressTableMap::CITY, 'CITY')
-            ->withColumn(AddressTableMap::ZIPCODE, 'ZIPCODE')
-            ->withColumn(AddressTableMap::PHONE, 'PHONE');
+            ->withColumn(AddressTableMap::COL_COMPANY, 'COMPANY')
+            ->withColumn(AddressTableMap::COL_ADDRESS1, 'ADDRESS')
+            ->withColumn(AddressTableMap::COL_CITY, 'CITY')
+            ->withColumn(AddressTableMap::COL_ZIPCODE, 'ZIPCODE')
+            ->withColumn(AddressTableMap::COL_PHONE, 'PHONE');
 
         $customers = $customerQuery->find();
 
@@ -294,7 +304,14 @@ class OrderController extends BaseAdminController
         return class_exists('\CreditNote\CreditNote');
     }
 
-    protected function performOrder(Order $order, Form $formValidate, EventDispatcherInterface $eventDispatcher, RequestStack $requestStack, SecurityContext $securityContext)
+    protected function performOrder(
+        Order $order,
+        Form $formValidate,
+        EventDispatcherInterface $eventDispatcher,
+        RequestStack $requestStack,
+        SecurityContext $securityContext,
+        TaxEngine $taxEngine
+    )
     {
         $this
             ->performCurrency($order, $formValidate)
@@ -303,7 +320,7 @@ class OrderController extends BaseAdminController
             ->performInvoiceAddress($order, $formValidate)
             ->performDeliveryAddress($order, $formValidate)
             ->performDeliveryAddress($order, $formValidate)
-            ->performProducts($order, $formValidate, $eventDispatcher, $requestStack, $securityContext)
+            ->performProducts($order, $formValidate, $eventDispatcher, $requestStack, $securityContext, $taxEngine)
             ->performShipping($order, $formValidate)
             ->performGlobalReduction($order, $formValidate)
             ->performPaymentModule($order, $formValidate)
@@ -652,7 +669,14 @@ class OrderController extends BaseAdminController
         return $this->getSession()->getAdminEditionLang();
     }
 
-    protected function performProducts(Order $order, Form $form, EventDispatcherInterface $eventDispatcher, RequestStack $requestStack, SecurityContext $securityContext)
+    protected function performProducts(
+        Order $order,
+        Form $form,
+        EventDispatcherInterface $eventDispatcher,
+        RequestStack $requestStack,
+        SecurityContext $securityContext,
+        TaxEngine $taxEngine,
+    )
     {
         $country = $this->getCountry($form);
 
@@ -678,7 +702,7 @@ class OrderController extends BaseAdminController
                 $product->getId()
             );
 
-            $productSaleElementsLoop = new ProductSaleElements($this->container, $requestStack, $eventDispatcher, $securityContext, Translator::getInstance(), [], "" );
+            $productSaleElementsLoop = new ProductSaleElements($taxEngine);
             $productSaleElementsLoop->init($this->container, $requestStack, $eventDispatcher, $securityContext, Translator::getInstance(), [], "");
 
             if (isset($productSaleElementIds[$key])) {
