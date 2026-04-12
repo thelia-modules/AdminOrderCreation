@@ -63,10 +63,9 @@ use Thelia\Model\TaxRuleI18n;
 use Thelia\TaxEngine\TaxEngine;
 use Thelia\Tools\I18n;
 use Thelia\Tools\URL;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * @Route("/admin/admin-order-creation/ajax", name="admin_order_creation_ajax")
  */
 class OrderController extends BaseAdminController
 {
@@ -75,6 +74,7 @@ class OrderController extends BaseAdminController
     /**
      * @Route("/modal/create", name="_create", methods="POST")
      */
+    #[Route('/admin/admin-order-creation/ajax', name: 'admin_order_creation_ajax')]
     public function ajaxModalCreateAction(
         Request $request,
         ParserContext $parserContext,
@@ -201,8 +201,8 @@ class OrderController extends BaseAdminController
      * @param Request $request
      * @return JsonResponse
      * @throws \Propel\Runtime\Exception\PropelException
-     * @Route("/search/customer", name="_customer", methods="GET")
      */
+    #[Route('/search/customer', name: '_customer', methods: ['GET'])]
     public function ajaxSearchCustomerAction(RequestStack $requestStack)
     {
         if (null !== $response = $this->checkAuth(AdminResources::ORDER, [], AccessManager::CREATE)) {
@@ -256,8 +256,8 @@ class OrderController extends BaseAdminController
      * @param Request $request
      * @return JsonResponse
      * @throws \Propel\Runtime\Exception\PropelException
-     * @Route("/search/product", name="_product", methods="GET")
      */
+    #[Route('/search/product', name: '_product', methods: ['GET'])]
     public function ajaxSearchProductAction(RequestStack $requestStack)
     {
         if (null !== $response = $this->checkAuth(AdminResources::ORDER, [], AccessManager::CREATE)) {
