@@ -60,7 +60,7 @@ use Thelia\Model\ProductI18n;
 use Thelia\Model\ProductQuery;
 use Thelia\Model\ProductSaleElementsQuery;
 use Thelia\Model\TaxRuleI18n;
-use Thelia\TaxEngine\TaxEngine;
+use Thelia\Domain\Taxation\TaxEngine\TaxEngine;
 use Thelia\Tools\I18n;
 use Thelia\Tools\URL;
 use Symfony\Component\Routing\Attribute\Route;
