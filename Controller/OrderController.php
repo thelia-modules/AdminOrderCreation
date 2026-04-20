@@ -65,16 +65,13 @@ use Thelia\Tools\I18n;
 use Thelia\Tools\URL;
 use Symfony\Component\Routing\Attribute\Route;
 
-/**
- */
+
+#[Route('/admin/admin-order-creation/ajax', name: 'admin_order_creation_ajax')]
 class OrderController extends BaseAdminController
 {
     use CriteriaSearchTrait;
 
-    /**
-     * @Route("/modal/create", name="_create", methods="POST")
-     */
-    #[Route('/admin/admin-order-creation/ajax', name: 'admin_order_creation_ajax')]
+    #[Route('/modal/create', name: '_create', methods: 'POST')]
     public function ajaxModalCreateAction(
         Request $request,
         ParserContext $parserContext,
