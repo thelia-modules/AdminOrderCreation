@@ -1,0 +1,22 @@
+<script type="text/javascript">
+    (function () {
+        var anchor = document.querySelector('[data-testid="order-actions"]');
+        if (!anchor) {
+            return;
+        }
+        var button = document.createElement('button');
+        button.className = 'btn btn-sm btn-primary';
+        button.id = 'btn-create-order';
+        button.style.marginLeft = '10px';
+        {% if creditNoteId is not null %}button.setAttribute('data-credit-note-id', '{{ creditNoteId }}');{% endif %}
+        {% if customerId is not null %}button.setAttribute('data-customer-id', '{{ customerId }}');{% endif %}
+        button.textContent = {{ 'Create new order'|trans({}, 'adminordercreation.bo.default')|json_encode|raw }};
+        anchor.insertBefore(button, anchor.firstChild);
+    })();
+</script>
+<style>
+    .select2-selection__clear {
+        font-size: 20px;
+        color: red;
+    }
+</style>

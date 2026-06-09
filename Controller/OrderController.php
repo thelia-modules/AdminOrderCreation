@@ -19,7 +19,6 @@ use CreditNote\Model\CreditNoteQuery;
 use CreditNote\Model\CreditNoteStatusQuery;
 use CreditNote\Model\CreditNoteTypeQuery;
 use CreditNote\Model\OrderCreditNote;
-use InvoiceRef\EventListeners\OrderListener;
 use Propel\Runtime\ActiveRecord\ActiveRecordInterface;
 use Propel\Runtime\Propel;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;

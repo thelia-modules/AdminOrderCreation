@@ -8,28 +8,36 @@
 
 namespace AdminOrderCreation\Hook\Back;
 
-use AdminOrderCreation\AdminOrderCreation;
 use Thelia\Core\Event\Hook\HookRenderEvent;
 use Thelia\Core\Hook\BaseHook;
-use Thelia\Core\Thelia;
 
 class OrderHook extends BaseHook
 {
-    public function onOrdersTableHeader(HookRenderEvent $event)
+    public static function getSubscribedHooks(): array
+    {
+        return [
+            'orders.top' => [
+                ['type' => 'back', 'method' => 'onOrdersTableHeader'],
+            ],
+            'orders.js' => [
+                ['type' => 'back', 'method' => 'onOrderJs'],
+            ],
+        ];
+    }
+
+    public function onOrdersTableHeader(HookRenderEvent $event): void
     {
         $event->add($this->render(
-            'admin-order-creation/hook/orders.table-header.html',
+            'admin-order-creation/hook/orders.table-header.html.twig',
             $event->getArguments()
         ));
     }
 
-    public function onOrderJs(HookRenderEvent $event)
+    public function onOrderJs(HookRenderEvent $event): void
     {
         $event->add($this->render(
-            'admin-order-creation/hook/orders.js.html',
-            array_merge($event->getArguments() + [
-
-            ])
+            'admin-order-creation/hook/orders.js.html.twig',
+            $event->getArguments()
         ));
     }
 }
