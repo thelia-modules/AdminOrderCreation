@@ -28,8 +28,8 @@
     </div>
 </div>
 
-{# Blank product-line scaffold cloned client-side by the module JS (the [] placeholders are rewritten to [N] per added row). #}
-<script type="text/html" id="template-order-creation-product-line">
+{# Blank product-line scaffold cloned client-side by the driver (the [] placeholders are rewritten to [N] per added row). #}
+<template id="template-order-creation-product-line">
     <tr>
         <td>
             <div class="mb-3">
@@ -61,18 +61,13 @@
         </td>
         <td></td>
         <td>
-            <button class="btn btn-danger js-action-delete" title="{{ 'Delete'|trans({}, 'adminordercreation.bo.default') }}">
+            <button type="button" class="btn btn-danger js-action-delete" title="{{ 'Delete'|trans({}, 'adminordercreation.bo.default') }}">
                 <i class="bi bi-trash"></i>
             </button>
         </td>
     </tr>
-</script>
+</template>
 
-{# The default-twig BO ships no jQuery; this module's 464-line script.js (select2 AJAX modal driver) is loaded with its jQuery + select2 deps from CDN. A full vanilla/Stimulus port is deferred. #}
-<link href="//cdnjs.cloudflare.com/ajax/libs/select2/4.0.2/css/select2.min.css" rel="stylesheet" />
-<script type="text/javascript" src="//code.jquery.com/jquery-3.7.1.min.js"></script>
-<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/select2/4.0.2/js/select2.min.js"></script>
-<script src="/modules/AdminOrderCreation/admin-order-creation/assets/js/script.js"></script>
 <style>
     .js-list {
         width: 100% !important;
@@ -85,4 +80,632 @@
         50%{opacity: 0;}
         100%{opacity: 1;}
     }
+    /* Vanilla autocomplete dropdown for customer/product search. */
+    .aoc-autocomplete {
+        position: relative;
+    }
+    .aoc-autocomplete-menu {
+        position: absolute;
+        z-index: 1080;
+        top: 100%;
+        left: 0;
+        right: 0;
+        max-height: 280px;
+        overflow-y: auto;
+        margin: 2px 0 0;
+        padding: 0;
+        list-style: none;
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, .15);
+        border-radius: .375rem;
+        box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .15);
+    }
+    .aoc-autocomplete-menu li {
+        padding: .375rem .75rem;
+        cursor: pointer;
+    }
+    .aoc-autocomplete-menu li:hover,
+    .aoc-autocomplete-menu li.is-active {
+        background-color: var(--bs-primary-bg-subtle, #e7f1ff);
+    }
+    .aoc-autocomplete-menu li small {
+        display: block;
+        color: var(--bs-secondary-color, #6c757d);
+    }
 </style>
+
+<script type="module">
+    // Vanilla driver for the AdminOrderCreation order-creation modal.
+    // Replaces the legacy jQuery + select2 script.js. The default-twig back-office
+    // ships no jQuery; this uses fetch(), URLSearchParams and Bootstrap 5 modals.
+    //
+    // DOM contract (js-* hooks, field names, data-* attributes) is shared with the
+    // server-rendered fragments order-create-modal.html.twig / product-line.html.twig.
+    (function () {
+        'use strict';
+
+        var modal = document.getElementById('modal-order-creation');
+        if (!modal || modal.dataset.aocBound === '1') {
+            return;
+        }
+        modal.dataset.aocBound = '1';
+
+        var bsModal = bootstrap.Modal.getOrCreateInstance(modal);
+        var currentRequest = null;        // AbortController for the modal reload POST
+        var refreshTimer = null;
+        var priceController = null;       // AbortController for product price calc
+        var shippingController = null;    // AbortController for shipping price calc
+
+        function abort(controller) {
+            if (controller) {
+                try { controller.abort(); } catch (e) { /* noop */ }
+            }
+        }
+
+        /****** Loader / error state ******/
+        function loaderOn() {
+            modal.querySelector('.modal-loader').classList.remove('d-none');
+            modal.querySelector('.modal-body').classList.add('d-none');
+        }
+
+        function loaderOff() {
+            modal.querySelector('.modal-loader').classList.add('d-none');
+            modal.querySelector('.modal-body').classList.remove('d-none');
+        }
+
+        function hideError() {
+            var error = modal.querySelector('.modal-error');
+            error.classList.add('d-none');
+            var iframe = error.querySelector('iframe');
+            if (iframe && iframe.contentDocument) {
+                iframe.contentDocument.open();
+                iframe.contentDocument.write('');
+                iframe.contentDocument.close();
+            }
+        }
+
+        function displayError(statusText, responseText) {
+            loaderOff();
+            modal.querySelector('.modal-body').classList.add('d-none');
+            var error = modal.querySelector('.modal-error');
+            error.classList.remove('d-none');
+            error.querySelector('.textStatus').textContent = statusText || '';
+            var iframe = error.querySelector('iframe');
+            if (iframe && iframe.contentDocument) {
+                iframe.contentDocument.open();
+                iframe.contentDocument.write(responseText || '');
+                iframe.contentDocument.close();
+            }
+        }
+
+        function reset() {
+            hideError();
+            loaderOn();
+        }
+
+        /****** Form serialization (mirrors jQuery serializeArray + overrides) ******/
+        // Returns a URLSearchParams. `overrides` replaces the value of an existing
+        // field by name, or appends it when the field is absent (legacy behaviour).
+        function buildBody(form, overrides) {
+            var params = new URLSearchParams();
+            var seen = {};
+            var fd = new FormData(form);
+            fd.forEach(function (value, name) {
+                if (overrides && Object.prototype.hasOwnProperty.call(overrides, name)) {
+                    params.append(name, overrides[name]);
+                    seen[name] = true;
+                } else {
+                    params.append(name, value);
+                }
+            });
+            if (overrides) {
+                Object.keys(overrides).forEach(function (name) {
+                    if (!seen[name]) {
+                        params.append(name, overrides[name]);
+                    }
+                });
+            }
+            return params;
+        }
+
+        /****** Modal AJAX reload ******/
+        function loadAjax(overridesOrParams) {
+            abort(currentRequest);
+            currentRequest = new AbortController();
+            var controller = currentRequest;
+
+            var body;
+            if (overridesOrParams instanceof URLSearchParams) {
+                body = overridesOrParams;
+            } else {
+                body = new URLSearchParams();
+                var data = overridesOrParams || {};
+                Object.keys(data).forEach(function (name) {
+                    if (data[name] !== undefined && data[name] !== null) {
+                        body.append(name, data[name]);
+                    }
+                });
+            }
+
+            // Small delay mirrors the legacy setTimeout that worked around a
+            // select2 redraw glitch; harmless and keeps abort semantics tidy.
+            setTimeout(function () {
+                fetch(modal.dataset.ajaxUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                    },
+                    body: body,
+                    signal: controller.signal
+                }).then(function (response) {
+                    return response.text().then(function (text) {
+                        if (!response.ok) {
+                            var err = new Error('http');
+                            err.statusText = response.statusText || ('HTTP ' + response.status);
+                            err.responseText = text;
+                            throw err;
+                        }
+                        return text;
+                    });
+                }).then(function (html) {
+                    loaderOff();
+                    modal.querySelector('.modal-body').innerHTML = html;
+                    modalReady();
+                }).catch(function (error) {
+                    if (error.name === 'AbortError') {
+                        return;
+                    }
+                    displayError(error.statusText, error.responseText);
+                });
+            }, 100);
+        }
+
+        function refreshAction(form) {
+            loadAjax(buildBody(form, { 'admin-order-creation-create[action]': 'refresh' }));
+        }
+
+        function refreshWithTimer(form) {
+            if (refreshTimer !== null) {
+                clearTimeout(refreshTimer);
+            }
+            refreshTimer = setTimeout(function () {
+                refreshAction(form);
+            }, 700);
+        }
+
+        /****** Vanilla autocomplete replacing select2 AJAX selects ******/
+        // Upgrades a <select class="js-select-customer|js-select-product"> into a
+        // text input + dropdown. The original select's name/value live on a hidden
+        // input so form serialization is unchanged. onSelect(id) is called on pick.
+        function buildAutocomplete(select, renderItem, formatSelection, onSelect) {
+            var url = select.dataset.url;
+            var placeholder = select.dataset.placeholder || '';
+            var name = select.getAttribute('name');
+            var preselected = select.querySelector('option[value]:not([value=""])');
+
+            var wrapper = document.createElement('div');
+            wrapper.className = 'aoc-autocomplete';
+
+            var input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'form-control';
+            input.placeholder = placeholder;
+            input.autocomplete = 'off';
+
+            var hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            if (name) {
+                hidden.name = name;
+            }
+            if (select.dataset.customerId) {
+                wrapper.dataset.customerId = select.dataset.customerId;
+            }
+
+            if (preselected) {
+                hidden.value = preselected.value;
+                input.value = preselected.textContent.trim();
+            }
+
+            var menu = document.createElement('ul');
+            menu.className = 'aoc-autocomplete-menu d-none';
+
+            wrapper.appendChild(input);
+            wrapper.appendChild(hidden);
+            wrapper.appendChild(menu);
+            select.parentNode.replaceChild(wrapper, select);
+
+            var searchController = null;
+            var searchTimer = null;
+            var items = [];
+            var activeIndex = -1;
+
+            function closeMenu() {
+                menu.classList.add('d-none');
+                menu.innerHTML = '';
+                activeIndex = -1;
+            }
+
+            function pick(item) {
+                hidden.value = item.id;
+                input.value = formatSelection(item);
+                closeMenu();
+                if (typeof onSelect === 'function') {
+                    onSelect(item, wrapper);
+                }
+            }
+
+            function renderMenu() {
+                menu.innerHTML = '';
+                if (!items.length) {
+                    closeMenu();
+                    return;
+                }
+                items.forEach(function (item, index) {
+                    var li = document.createElement('li');
+                    li.innerHTML = renderItem(item);
+                    li.addEventListener('mousedown', function (event) {
+                        // mousedown (not click) so it fires before input blur.
+                        event.preventDefault();
+                        pick(item);
+                    });
+                    li.addEventListener('mouseenter', function () {
+                        setActive(index);
+                    });
+                    menu.appendChild(li);
+                });
+                menu.classList.remove('d-none');
+            }
+
+            function setActive(index) {
+                var lis = menu.querySelectorAll('li');
+                lis.forEach(function (li) { li.classList.remove('is-active'); });
+                activeIndex = index;
+                if (index >= 0 && lis[index]) {
+                    lis[index].classList.add('is-active');
+                }
+            }
+
+            function search(term) {
+                abort(searchController);
+                searchController = new AbortController();
+                var controller = searchController;
+
+                var query = new URLSearchParams({ q: term });
+                if (wrapper.dataset.customerId) {
+                    query.append('customerId', wrapper.dataset.customerId);
+                }
+
+                fetch(url + '?' + query.toString(), {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    signal: controller.signal
+                }).then(function (response) {
+                    if (!response.ok) {
+                        return response.text().then(function (text) {
+                            var err = new Error('http');
+                            err.statusText = response.statusText || ('HTTP ' + response.status);
+                            err.responseText = text;
+                            throw err;
+                        });
+                    }
+                    return response.json();
+                }).then(function (data) {
+                    items = (data && data.items) ? data.items : [];
+                    renderMenu();
+                }).catch(function (error) {
+                    if (error.name === 'AbortError') {
+                        return;
+                    }
+                    displayError(error.statusText, error.responseText);
+                });
+            }
+
+            input.addEventListener('input', function () {
+                var term = input.value.trim();
+                // Editing clears the previous selection until a new pick.
+                hidden.value = '';
+                if (searchTimer) {
+                    clearTimeout(searchTimer);
+                }
+                if (term.length < 3) {
+                    closeMenu();
+                    return;
+                }
+                searchTimer = setTimeout(function () {
+                    search(term);
+                }, 250);
+            });
+
+            input.addEventListener('keydown', function (event) {
+                var lis = menu.querySelectorAll('li');
+                if (menu.classList.contains('d-none') || !lis.length) {
+                    return;
+                }
+                if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    setActive(Math.min(activeIndex + 1, lis.length - 1));
+                } else if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    setActive(Math.max(activeIndex - 1, 0));
+                } else if (event.key === 'Enter') {
+                    if (activeIndex >= 0 && items[activeIndex]) {
+                        event.preventDefault();
+                        pick(items[activeIndex]);
+                    }
+                } else if (event.key === 'Escape') {
+                    closeMenu();
+                }
+            });
+
+            input.addEventListener('blur', function () {
+                // Defer so a mousedown pick can complete first.
+                setTimeout(closeMenu, 150);
+            });
+        }
+
+        function initCustomerSearch(form) {
+            var select = form.querySelector('.js-select-customer');
+            if (!select || select.dataset.aocUpgraded === '1') {
+                return;
+            }
+            select.dataset.aocUpgraded = '1';
+            buildAutocomplete(
+                select,
+                function (item) {
+                    return '<div>' + escapeHtml(item.ref) + ' : (' + escapeHtml(item.firstname) + ' ' + escapeHtml(item.lastname) + ')</div>'
+                        + (item.address ? '<small>' + escapeHtml(item.address) + '</small>' : '');
+                },
+                function (item) {
+                    return item.ref + ' : (' + item.firstname + ' ' + item.lastname + ')';
+                },
+                function (item) {
+                    loadAjax(buildBody(form, {
+                        'admin-order-creation-create[customer_id]': item.id,
+                        'admin-order-creation-create[action]': 'refresh'
+                    }));
+                }
+            );
+        }
+
+        function initProductSearch(select, form) {
+            if (!select || select.dataset.aocUpgraded === '1') {
+                return;
+            }
+            select.dataset.aocUpgraded = '1';
+            var row = select.closest('tr');
+            buildAutocomplete(
+                select,
+                function (item) {
+                    return escapeHtml(item.ref) + ' : ' + escapeHtml(item.title);
+                },
+                function (item) {
+                    return item.ref + ' : ' + item.title;
+                },
+                function () {
+                    if (row) {
+                        var refresh = row.querySelector('.js-refresh-price');
+                        if (refresh) {
+                            refresh.value = '1';
+                        }
+                    }
+                    refreshAction(form);
+                }
+            );
+        }
+
+        function escapeHtml(value) {
+            return String(value === undefined || value === null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        /****** Price calculation (GET data-url -> { result }) ******/
+        function calculatePrice(field, controllerRef, taxRuleId, onResult) {
+            abort(controllerRef.current);
+            controllerRef.current = new AbortController();
+            var controller = controllerRef.current;
+
+            var value = parseFloat(field.value);
+            if (!value) {
+                value = 0;
+            }
+
+            var query = new URLSearchParams({
+                price: value,
+                tax_rule: taxRuleId,
+                tax_rule_id: taxRuleId
+            });
+
+            fetch(field.dataset.url + '?' + query.toString(), {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                signal: controller.signal
+            }).then(function (response) {
+                if (!response.ok) {
+                    return response.text().then(function (text) {
+                        var err = new Error('http');
+                        err.statusText = response.statusText || ('HTTP ' + response.status);
+                        err.responseText = text;
+                        throw err;
+                    });
+                }
+                return response.json();
+            }).then(function (data) {
+                onResult(data.result);
+            }).catch(function (error) {
+                if (error.name === 'AbortError') {
+                    return;
+                }
+                displayError(error.statusText, error.responseText);
+            });
+        }
+
+        /****** Wire up the freshly rendered modal body ******/
+        function modalReady() {
+            var form = modal.querySelector('.modal-body form');
+            if (!form) {
+                return;
+            }
+
+            if (form.dataset.aocBound === '1') {
+                return;
+            }
+            form.dataset.aocBound = '1';
+
+            // Customer + per-row product autocompletes.
+            initCustomerSearch(form);
+            form.querySelectorAll('.js-table-product-line tbody .js-select-product').forEach(function (select) {
+                initProductSearch(select, form);
+            });
+
+            // Submit -> create.
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                loadAjax(buildBody(form, { 'admin-order-creation-create[action]': 'create' }));
+            });
+
+            // Plain selects that trigger a refresh on change (status, addresses,
+            // PSE, currency, country, delivery/payment module, credit note...).
+            form.addEventListener('change', function (event) {
+                var target = event.target;
+
+                if (target.matches('.js-select-status, .js-select-invoice-address, .js-select-delivery-address, '
+                    + '.js-select-delivery-module, .js-select-payment-module, .js-field-country, '
+                    + '.js-select-credit-note, .js-select-credit-note-status, .js-select-credit-note-type')) {
+                    refreshAction(form);
+                    return;
+                }
+
+                if (target.matches('.js-field-currency')) {
+                    refreshAction(form);
+                    return;
+                }
+
+                // A PSE change must also flag the row for a price refresh.
+                if (target.matches('.js-select-product-sale-element')) {
+                    var pseRow = target.closest('tr');
+                    if (pseRow) {
+                        var refresh = pseRow.querySelector('.js-refresh-price');
+                        if (refresh) {
+                            refresh.value = '1';
+                        }
+                    }
+                    refreshAction(form);
+                    return;
+                }
+
+                // Quantity / global reduction -> debounced refresh.
+                if (target.matches('.js-action-refresh')) {
+                    if (String(target.value).length) {
+                        refreshWithTimer(form);
+                    }
+                    return;
+                }
+
+                // Product line price (HT/TTC) -> recompute sibling, then refresh.
+                if (target.matches('.js-product-price-with-tax, .js-product-price-without-tax')) {
+                    var row = target.closest('tr');
+                    var isUntaxed = target.classList.contains('js-product-price-without-tax');
+                    calculatePrice(target, { get current() { return priceController; }, set current(v) { priceController = v; } }, target.dataset.taxRuleId, function (result) {
+                        var sibling = row.querySelector(isUntaxed ? '.js-product-price-with-tax' : '.js-product-price-without-tax');
+                        if (sibling) {
+                            sibling.value = result;
+                        }
+                        refreshWithTimer(form);
+                    });
+                    return;
+                }
+
+                // Shipping amount (HT/TTC) -> recompute sibling, then refresh.
+                if (target.matches('.js-field-amount-without-tax, .js-field-amount-with-tax')) {
+                    var shippingArea = form.querySelector('.js-shipping-area');
+                    var taxRuleSelect = shippingArea.querySelector('.js-field-tax-rule');
+                    var taxRuleId = taxRuleSelect ? parseInt(taxRuleSelect.value, 10) : 0;
+                    var untaxed = target.classList.contains('js-field-amount-without-tax');
+                    calculatePrice(target, { get current() { return shippingController; }, set current(v) { shippingController = v; } }, taxRuleId, function (result) {
+                        var sibling = shippingArea.querySelector(untaxed ? '.js-field-amount-with-tax' : '.js-field-amount-without-tax');
+                        if (sibling) {
+                            sibling.value = result;
+                        }
+                        refreshWithTimer(form);
+                    });
+                    return;
+                }
+
+                // Shipping tax-rule change -> recompute from the TTC amount.
+                if (target.matches('.js-field-tax-rule')) {
+                    var area = form.querySelector('.js-shipping-area');
+                    var withTaxField = area.querySelector('.js-field-amount-with-tax');
+                    var taxId = parseInt(target.value, 10);
+                    if (withTaxField) {
+                        calculatePrice(withTaxField, { get current() { return shippingController; }, set current(v) { shippingController = v; } }, taxId, function (result) {
+                            var withoutTaxField = area.querySelector('.js-field-amount-without-tax');
+                            if (withoutTaxField) {
+                                withoutTaxField.value = result;
+                            }
+                            refreshWithTimer(form);
+                        });
+                    }
+                    return;
+                }
+            });
+
+            // Add a product line: clone the <template>, renumber [] -> [key].
+            var tableProductLine = form.querySelector('.js-table-product-line');
+            var template = document.getElementById('template-order-creation-product-line');
+
+            if (tableProductLine) {
+                tableProductLine.addEventListener('click', function (event) {
+                    var addBtn = event.target.closest('.js-action-add');
+                    if (addBtn && tableProductLine.contains(addBtn)) {
+                        event.preventDefault();
+                        var key = parseInt(addBtn.dataset.key || '0', 10) + 1;
+                        addBtn.dataset.key = String(key);
+
+                        var html = template.innerHTML.replace(/\[\]/g, '[' + key + ']');
+                        var tbody = tableProductLine.querySelector('tbody');
+                        var temp = document.createElement('tbody');
+                        temp.innerHTML = html.trim();
+                        var newRow = temp.querySelector('tr');
+                        tbody.appendChild(newRow);
+
+                        var newSelect = newRow.querySelector('.js-select-product');
+                        if (newSelect) {
+                            initProductSearch(newSelect, form);
+                        }
+                        return;
+                    }
+
+                    var delBtn = event.target.closest('.js-action-delete');
+                    if (delBtn && tableProductLine.contains(delBtn)) {
+                        event.preventDefault();
+                        var row = delBtn.closest('tr');
+                        if (row) {
+                            row.remove();
+                        }
+                        refreshAction(form);
+                    }
+                });
+            }
+        }
+
+        /****** Open the modal from the injected button ******/
+        document.body.addEventListener('click', function (event) {
+            var btn = event.target.closest('#btn-create-order');
+            if (!btn) {
+                return;
+            }
+            bsModal.show();
+            loadAjax({
+                'admin-order-creation-create[action]': 'open',
+                'admin-order-creation-create[customer_id]': btn.dataset.customerId,
+                'admin-order-creation-create[credit_note_id]': btn.dataset.creditNoteId
+            });
+        });
+
+        modal.addEventListener('hidden.bs.modal', function () {
+            reset();
+        });
+    }());
+</script>
