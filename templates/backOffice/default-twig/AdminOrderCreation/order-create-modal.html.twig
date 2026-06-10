@@ -1,0 +1,445 @@
+{# AJAX fragment injected into #modal-order-creation .modal-body by the module script.js. #}
+{# Every js-* class, field name and data-* attribute below is part of the contract with that script: keep them in sync. #}
+<form method="POST" action="{{ path('admin_order_creation_ajax_create') }}">
+
+    <input type="hidden" name="admin-order-creation-create[action]" value="create" />
+
+    {% if errorMessages|length > 0 %}
+        <div class="alert alert-danger">
+            {% for errorMessage in errorMessages %}
+                {{ errorMessage }}{% if not loop.last %}<br/>{% endif %}
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="alert alert-info">
+                {{ 'This order use the currency : %currency'|trans({'%currency': ''}, 'adminordercreation.bo.default') }}
+                <select name="admin-order-creation-create[currency_id]" class="js-field-currency">
+                    {% for currency in currencies %}
+                        <option value="{{ currency.id }}" {% if currency.id == selectedCurrencyId %}selected{% endif %}>{{ currency.symbol }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="alert alert-info">
+                {{ 'This order use the country : %country'|trans({'%country': ''}, 'adminordercreation.bo.default') }}
+                <select name="admin-order-creation-create[country_id]" class="js-field-country">
+                    {% for country in countries %}
+                        <option value="{{ country.id }}" {% if country.id == selectedCountryId %}selected{% endif %}>{{ country.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        {# status select #}
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label class="form-label">{{ 'Status :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                <select class="form-control js-select-status" name="admin-order-creation-create[status_id]">
+                    {% for status in statuses %}
+                        <option value="{{ status.id }}" {% if status.selected %}selected{% endif %} data-color="{{ status.color }}">{{ status.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        {# customer select #}
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label class="form-label">{{ 'Customer :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                <select class="form-control js-select-customer" name="admin-order-creation-create[customer_id]" data-placeholder="{{ 'Search...'|trans({}, 'adminordercreation.bo.default') }}" data-url="{{ path('admin_order_creation_ajax_customer') }}">
+                    {% if customer %}
+                        <option value="{{ customer.id }}">{{ customer.ref }} : ({{ customer.firstname }} {{ customer.lastname }})</option>
+                    {% else %}
+                        <option value="">{{ 'Search...'|trans({}, 'adminordercreation.bo.default') }}</option>
+                    {% endif %}
+                </select>
+            </div>
+        </div>
+
+        {# delivery module #}
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label class="form-label">{{ 'Delivery module :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                <select class="form-control js-select-delivery-module" name="admin-order-creation-create[delivery_module_id]" data-placeholder="{{ 'Search...'|trans({}, 'adminordercreation.bo.default') }}">
+                    {% for module in deliveryModules %}
+                        <option value="{{ module.id }}" {% if module.selected %}selected{% endif %}>{{ module.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        {# payment module #}
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label class="form-label">{{ 'Payment module :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                <select class="form-control js-select-payment-module" name="admin-order-creation-create[payment_module_id]" data-placeholder="{{ 'Search...'|trans({}, 'adminordercreation.bo.default') }}">
+                    {% for module in paymentModules %}
+                        <option value="{{ module.id }}" {% if module.selected %}selected{% endif %}>{{ module.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        {# invoice address #}
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header">{{ 'Invoice address'|trans({}, 'adminordercreation.bo.default') }}</div>
+                <div class="card-body">
+
+                    {% set invoiceOther = invoiceAddressId is empty %}
+                    <div class="mb-3">
+                        <select class="form-control js-select-invoice-address" name="admin-order-creation-create[invoice_address_id]" {% if not customer %}disabled{% endif %}>
+                            {% if customer %}
+                                {% for address in addresses %}
+                                    <option value="{{ address.id }}" {% if address.id == invoiceAddressId %}selected{% endif %}>
+                                        ({{ address.firstname }} {{ address.lastname }}) : {{ address.address1 }} {{ address.city }} {{ address.zipcode }}
+                                    </option>
+                                {% endfor %}
+                                <option value="" {% if invoiceOther %}selected{% endif %}>{{ 'Other'|trans({}, 'adminordercreation.bo.default') }}</option>
+                            {% endif %}
+                        </select>
+                    </div>
+
+                    <div class="row js-other-area{% if not invoiceOther or not customer %} d-none{% endif %}">
+                        <div class="mb-3 col-md-3">
+                            <label class="form-label">{{ 'Title :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <select name="admin-order-creation-create[invoice_address_title]" class="form-control">
+                                {% for title in titles %}
+                                    <option value="{{ title.id }}" {% if title.id == invoiceAddress.titleId %}selected{% endif %}>{{ title.long }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3 col-md-4">
+                            <label class="form-label">{{ 'Firstname :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[invoice_address_firstname]" class="form-control" value="{{ invoiceAddress.firstname }}" />
+                        </div>
+                        <div class="mb-3 col-md-5">
+                            <label class="form-label">{{ 'Lastname :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[invoice_address_lastname]" class="form-control" value="{{ invoiceAddress.lastname }}" />
+                        </div>
+                        <div class="mb-3 col-md-12">
+                            <label class="form-label">{{ 'Address :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[invoice_address_address1]" class="form-control" value="{{ invoiceAddress.address1 }}" />
+                        </div>
+                        <div class="mb-3 col-md-12">
+                            <label class="form-label">{{ 'Address complement :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[invoice_address_address2]" class="form-control" value="{{ invoiceAddress.address2 }}" />
+                        </div>
+                        <div class="mb-3 col-md-6">
+                            <label class="form-label">{{ 'City :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[invoice_address_city]" class="form-control" value="{{ invoiceAddress.city }}" />
+                        </div>
+                        <div class="mb-3 col-md-6">
+                            <label class="form-label">{{ 'Zipcode :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[invoice_address_zipcode]" class="form-control" value="{{ invoiceAddress.zipcode }}" />
+                        </div>
+                        <div class="mb-3 col-md-6">
+                            <label class="form-label">{{ 'Country :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <select name="admin-order-creation-create[invoice_address_country_id]" class="form-control">
+                                {% for country in countries %}
+                                    <option value="{{ country.id }}" {% if country.id == invoiceAddress.countryId %}selected{% endif %}>{{ country.title }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3 col-md-6">
+                            <label class="form-label">{{ 'Company :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[invoice_address_company]" class="form-control" value="{{ invoiceAddress.company }}" />
+                        </div>
+                        <div class="mb-3 col-md-6">
+                            <label class="form-label">{{ 'Phone number :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[invoice_address_phone]" class="form-control" value="{{ invoiceAddress.phone }}" />
+                        </div>
+                        <div class="mb-3 col-md-6">
+                            <label class="form-label">{{ 'Cellphone number :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[invoice_address_cellphone]" class="form-control" value="{{ invoiceAddress.cellphone }}" />
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        {# delivery address #}
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header">{{ 'Delivery address'|trans({}, 'adminordercreation.bo.default') }}</div>
+                <div class="card-body">
+
+                    {% set deliveryOther = deliveryAddressId is empty %}
+                    <div class="mb-3">
+                        <select class="form-control js-select-delivery-address" name="admin-order-creation-create[delivery_address_id]" {% if not customer %}disabled{% endif %}>
+                            {% if customer %}
+                                {% for address in addresses %}
+                                    <option value="{{ address.id }}" {% if address.id == deliveryAddressId %}selected{% endif %}>
+                                        ({{ address.firstname }} {{ address.lastname }}) : {{ address.address1 }} {{ address.city }} {{ address.zipcode }}
+                                    </option>
+                                {% endfor %}
+                                <option value="" {% if deliveryOther %}selected{% endif %}>{{ 'Other'|trans({}, 'adminordercreation.bo.default') }}</option>
+                            {% endif %}
+                        </select>
+                    </div>
+
+                    <div class="row js-other-area{% if not deliveryOther or not customer %} d-none{% endif %}">
+                        <div class="mb-3 col-md-3">
+                            <label class="form-label">{{ 'Title :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <select name="admin-order-creation-create[delivery_address_title]" class="form-control">
+                                {% for title in titles %}
+                                    <option value="{{ title.id }}" {% if title.id == deliveryAddress.titleId %}selected{% endif %}>{{ title.long }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3 col-md-4">
+                            <label class="form-label">{{ 'Firstname :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[delivery_address_firstname]" class="form-control" value="{{ deliveryAddress.firstname }}" />
+                        </div>
+                        <div class="mb-3 col-md-5">
+                            <label class="form-label">{{ 'Lastname :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[delivery_address_lastname]" class="form-control" value="{{ deliveryAddress.lastname }}" />
+                        </div>
+                        <div class="mb-3 col-md-12">
+                            <label class="form-label">{{ 'Address :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[delivery_address_address1]" class="form-control" value="{{ deliveryAddress.address1 }}" />
+                        </div>
+                        <div class="mb-3 col-md-12">
+                            <label class="form-label">{{ 'Address complement :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[delivery_address_address2]" class="form-control" value="{{ deliveryAddress.address2 }}" />
+                        </div>
+                        <div class="mb-3 col-md-6">
+                            <label class="form-label">{{ 'City :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[delivery_address_city]" class="form-control" value="{{ deliveryAddress.city }}" />
+                        </div>
+                        <div class="mb-3 col-md-6">
+                            <label class="form-label">{{ 'Zipcode :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[delivery_address_zipcode]" class="form-control" value="{{ deliveryAddress.zipcode }}" />
+                        </div>
+                        <div class="mb-3 col-md-6">
+                            <label class="form-label">{{ 'Country :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <select name="admin-order-creation-create[delivery_address_country_id]" class="form-control">
+                                {% for country in countries %}
+                                    <option value="{{ country.id }}" {% if country.id == deliveryAddress.countryId %}selected{% endif %}>{{ country.title }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3 col-md-6">
+                            <label class="form-label">{{ 'Company :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[delivery_address_company]" class="form-control" value="{{ deliveryAddress.company }}" />
+                        </div>
+                        <div class="mb-3 col-md-6">
+                            <label class="form-label">{{ 'Phone number :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[delivery_address_phone]" class="form-control" value="{{ deliveryAddress.phone }}" />
+                        </div>
+                        <div class="mb-3 col-md-6">
+                            <label class="form-label">{{ 'Cellphone number :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                            <input type="text" name="admin-order-creation-create[delivery_address_cellphone]" class="form-control" value="{{ deliveryAddress.cellphone }}" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# products #}
+        <div class="col-md-12">
+            <div class="card mb-3">
+                <div class="card-header">{{ 'Products'|trans({}, 'adminordercreation.bo.default') }}</div>
+                <div class="card-body">
+                    <table class="table js-table-product-line">
+                        <thead>
+                            <tr>
+                                <th width="30%">
+                                    {{ 'Product'|trans({}, 'adminordercreation.bo.default') }} / {{ 'Product sale element'|trans({}, 'adminordercreation.bo.default') }}
+                                </th>
+                                <th width="15%">
+                                    {{ 'Unit price with tax'|trans({}, 'adminordercreation.bo.default') }}
+                                </th>
+                                <th width="10%">
+                                    {{ 'Quantity'|trans({}, 'adminordercreation.bo.default') }}
+                                </th>
+                                <th width="20%">
+                                    {{ 'Price'|trans({}, 'adminordercreation.bo.default') }}
+                                </th>
+                                <th width="5%">
+                                    <button class="btn btn-success js-action-add" data-key="{{ productLineMaxKey }}" title="{{ 'Add product'|trans({}, 'adminordercreation.bo.default') }}">+</button>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for line in productLines %}
+                                {% include '@AdminOrderCreationModule/backOffice/default-twig/AdminOrderCreation/product-line.html.twig' %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        {# shipping #}
+        <div class="col-md-12">
+            <div class="card mb-3">
+                <div class="card-header">{{ 'Shipping'|trans({}, 'adminordercreation.bo.default') }}</div>
+                <div class="card-body js-shipping-area">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">{{ 'Price without tax :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                                <input name="admin-order-creation-create[shipping_price]" class="form-control js-field-amount-without-tax" type="number" min="0" step="0.000001" value="{{ shippingPrice }}" data-url="{{ path('admin.product.calculate-price', {action: 'untaxed_to_taxed'}) }}" />
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">{{ 'Tax rule :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                                <select name="admin-order-creation-create[shipping_tax_rule_id]" class="form-control js-field-tax-rule" data-url="{{ path('admin.product.calculate-price', {action: 'taxed_to_untaxed'}) }}">
+                                    {% for taxRule in taxRules %}
+                                        <option value="{{ taxRule.id }}" {% if taxRule.id == selectedShippingTaxRuleId %}selected{% endif %}>{{ taxRule.title }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">{{ 'Price with tax :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                                <input name="admin-order-creation-create[shipping_price_with_tax]" class="form-control js-field-amount-with-tax" type="number" min="0" step="0.000001" value="{{ shippingPriceWithTax }}" data-url="{{ path('admin.product.calculate-price', {action: 'taxed_to_untaxed'}) }}" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# global reduction #}
+        <div class="col-md-12">
+            <div class="card mb-3">
+                <div class="card-header">{{ 'Global reduction'|trans({}, 'adminordercreation.bo.default') }}</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label class="form-label">{{ 'Type :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                                <select class="form-control js-action-refresh" name="admin-order-creation-create[reduction_type]">
+                                    <option value="1" {% if reductionType == 1 %}selected{% endif %}>{{ 'Percentage'|trans({}, 'adminordercreation.bo.default') }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label class="form-label">{{ 'Value :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                                <input class="form-control js-action-refresh" type="number" min="0" step="0.01" name="admin-order-creation-create[reduction]" value="{{ reduction }}" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if hasCreditNoteModule %}
+            <div class="col-md-12">
+                <div class="card mb-3">
+                    <div class="card-header">{{ 'Use Credit Note :'|trans({}, 'adminordercreation.bo.default') }}</div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">{{ 'Credit note :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                                    <select class="form-control js-select-credit-note" name="admin-order-creation-create[credit_note_id]" data-placeholder="{{ 'Search...'|trans({}, 'adminordercreation.bo.default') }}" {% if not customer %}disabled{% endif %}>
+                                        <option value=""></option>
+                                        {% if customer %}
+                                            {% for creditNote in creditNotes %}
+                                                <option value="{{ creditNote.id }}" {% if creditNote.selected %}selected{% endif %}>{{ creditNote.ref }} - {{ creditNote.invoiceRef }} : {{ creditNote.amount }}</option>
+                                            {% endfor %}
+                                        {% endif %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                {% if selectedCreditNote %}
+                                    <div class="alert alert-info">
+                                        {{ 'This command uses the credit note ref %ref for the amount of %amount with tax.'|trans({'%ref': selectedCreditNote.ref, '%amount': selectedCreditNote.amount}, 'adminordercreation.bo.default') }}
+                                    </div>
+                                    {% if selectedCreditNote.diffAmount > 0 %}
+                                        <div class="alert alert-warning">
+                                            {{ 'Your customer will have to pay the difference of %amount with tax'|trans({'%amount': selectedCreditNote.diffFormatted}, 'adminordercreation.bo.default') }}
+                                        </div>
+                                    {% elseif selectedCreditNote.diffAmount < 0 %}
+                                        <div class="alert alert-warning">
+                                            {{ 'A new credit note of %amount with tax will be issued for this customer.'|trans({'%amount': selectedCreditNote.diffFormatted}, 'adminordercreation.bo.default') }}
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">{{ 'Status of new credit note :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                                                    <select class="form-control js-select-credit-note-status" name="admin-order-creation-create[credit_note_status_id]">
+                                                        {% for creditNoteStatus in creditNoteStatuses %}
+                                                            <option value="{{ creditNoteStatus.id }}" data-color="{{ creditNoteStatus.color }}" {% if creditNoteStatus.selected %}selected{% endif %}>{{ creditNoteStatus.label }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">{{ 'Type of new credit note :'|trans({}, 'adminordercreation.bo.default') }}</label>
+                                                    <select class="form-control js-select-credit-note-type" name="admin-order-creation-create[credit_note_type_id]">
+                                                        {% for creditNoteType in creditNoteTypes %}
+                                                            <option value="{{ creditNoteType.id }}" data-color="{{ creditNoteType.color }}" {% if creditNoteType.selected %}selected{% endif %}>{{ creditNoteType.label }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="col-md-12">
+            <div class="card mb-3">
+                <div class="card-header">{{ 'Order Informations :'|trans({}, 'adminordercreation.bo.default') }}</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 text-center">
+                            <h2>
+                                <span>{{ 'Total without tax :'|trans({}, 'adminordercreation.bo.default') }}</span><span>
+                                    {{ totals.withoutTax }} HT
+                                </span>
+                            </h2>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <h2>
+                                <span>{{ 'Total tax :'|trans({}, 'adminordercreation.bo.default') }}</span><span>
+                                    {{ totals.tax }}
+                                </span>
+                            </h2>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <h2>
+                                <span>{{ 'Total with tax :'|trans({}, 'adminordercreation.bo.default') }}</span><span>
+                                    {{ totals.withTax }} TTC
+                                </span>
+                            </h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-12 modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" aria-hidden="true"><i class="bi bi-x-lg"></i>
+                {{ 'Cancel'|trans({}, 'adminordercreation.bo.default') }}
+            </button>
+
+            <button type="submit" class="btn btn-primary">
+                {{ 'Create order'|trans({}, 'adminordercreation.bo.default') }}
+            </button>
+        </div>
+
+    </div>
+</form>

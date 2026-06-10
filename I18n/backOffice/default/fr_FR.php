@@ -56,6 +56,7 @@ return array(
     'Unit price with tax' => 'Prix unitaire TTC',
     'Use Credit Note :' => 'Utiliser un avoir :',
     'Value :' => 'Value :',
+    'View order' => 'Voir la commande',
     'Your customer will have to pay the difference of %amount with tax' => 'Votre client devra payer la différence d\'un montant de %amount TTC',
     'Zipcode :' => 'Code postal :',
     'Phone number :' => 'Numéro de téléphone :',

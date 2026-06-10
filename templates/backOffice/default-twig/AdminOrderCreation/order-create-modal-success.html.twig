@@ -1,0 +1,4 @@
+{# AJAX fragment returned after a successful order creation (access already checked by the controller). #}
+<div class="alert alert-success text-center">
+    <a href="{{ path('admin.order.update.view', {order_id: order.id}) }}">{{ 'View order'|trans({}, 'adminordercreation.bo.default') }}</a>
+</div>

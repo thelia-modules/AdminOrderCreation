@@ -1,0 +1,81 @@
+{# One product row of the order-creation modal table. Expects a "line" array built by OrderController::buildProductLine(). #}
+{# The js-* classes and field names are consumed by the module script.js: keep them in sync. #}
+<tr>
+    <td>
+        <div class="mb-3">
+            <select class="form-control js-select-product" name="admin-order-creation-create[product_id][{{ line.key }}]" data-placeholder="{{ 'Search...'|trans({}, 'adminordercreation.bo.default') }}" data-url="{{ path('admin_order_creation_ajax_product') }}">
+                {% if line.productId %}
+                    <option value="{{ line.productId }}">{{ line.productRef }} : {{ line.productTitle }}</option>
+                {% endif %}
+            </select>
+        </div>
+        <div class="mb-3">
+            {% if line.productId %}
+                {% if line.pseOptions|length > 0 %}
+                    <select class="form-control js-select-product-sale-element" name="admin-order-creation-create[product_sale_element_id][{{ line.key }}]">
+                        {% for pse in line.pseOptions %}
+                            <option {% if pse.selected %}selected{% endif %} data-quantity="{{ pse.quantity }}" data-ref="{{ pse.ref }}" data-color="{{ pse.color }}" value="{{ pse.id }}">{{ pse.label }}</option>
+                        {% endfor %}
+                    </select>
+                {% else %}
+                    {{ 'Default product sale element'|trans({}, 'adminordercreation.bo.default') }}
+                    {% if line.selectedPseId %}
+                        <input type="hidden" value="{{ line.selectedPseId }}" name="admin-order-creation-create[product_sale_element_id][{{ line.key }}]" />
+                    {% endif %}
+                {% endif %}
+            {% endif %}
+        </div>
+    </td>
+    <td>
+        {% if line.productId and line.selectedPseId %}
+            <input class="js-refresh-price" type="hidden" name="admin-order-creation-create[refresh_price][{{ line.key }}]" value="0" />
+
+            <div class="mb-3">
+                <div class="input-group">
+                    <input class="form-control js-product-price-without-tax" data-tax-rule-id="{{ line.taxRuleId }}"
+                           data-url="{{ path('admin.product.calculate-price', {action: 'untaxed_to_taxed'}) }}"
+                           type="number" min="0" step="0.000001" name="admin-order-creation-create[product_price_without_tax][{{ line.key }}]" value="{{ line.priceWithoutTax }}" />
+                    <span class="input-group-text">HT</span>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <div class="input-group">
+                    <input class="form-control js-product-price-with-tax" data-tax-rule-id="{{ line.taxRuleId }}"
+                           data-url="{{ path('admin.product.calculate-price', {action: 'taxed_to_untaxed'}) }}"
+                           type="number" min="0" step="0.000001" name="admin-order-creation-create[product_price_with_tax][{{ line.key }}]" value="{{ line.priceWithTax }}" />
+                    <span class="input-group-text">TTC</span>
+                </div>
+            </div>
+        {% endif %}
+    </td>
+    <td>
+        {% if line.productId and line.selectedPseId %}
+            <div class="mb-3">
+                <input class="form-control js-action-refresh" type="number" min="1" step="1" name="admin-order-creation-create[product_quantity][{{ line.key }}]" value="{{ line.quantity }}" />
+            </div>
+        {% endif %}
+    </td>
+    <td>
+        {% if line.selectedPseId %}
+            <div class="mb-3">
+                <div class="input-group">
+                    <input class="form-control js-action-refresh" type="number" min="0" step="0.000001" disabled value="{{ line.totalWithoutTax }}" />
+                    <span class="input-group-text">HT</span>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <div class="input-group">
+                    <input class="form-control js-action-refresh" type="number" min="0" step="0.000001" disabled value="{{ line.totalWithTax }}" />
+                    <span class="input-group-text">TTC</span>
+                </div>
+            </div>
+        {% endif %}
+    </td>
+    <td>
+        <button class="btn btn-danger js-action-delete" title="{{ 'Delete'|trans({}, 'adminordercreation.bo.default') }}">
+            <i class="bi bi-trash"></i>
+        </button>
+    </td>
+</tr>
