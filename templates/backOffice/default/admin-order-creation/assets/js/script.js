@@ -274,7 +274,8 @@
                 dataType: 'json',
                 data: {
                     price: val,
-                    tax_rule: this.dataset.taxRuleId
+                    tax_rule: this.dataset.taxRuleId,
+                    tax_rule_id: this.dataset.taxRuleId
                 }
             });
 
@@ -351,7 +352,8 @@
                 dataType: 'json',
                 data: {
                     price: val,
-                    tax_rule: parseInt($thr.find('.js-field-tax-rule').val())
+                    tax_rule: parseInt($thr.find('.js-field-tax-rule').val()),
+                    tax_rule_id: parseInt($thr.find('.js-field-tax-rule').val())
                 }
             });
 
@@ -389,7 +391,8 @@
                 dataType: 'json',
                 data: {
                     price: val,
-                    tax_rule: parseInt($thr.find('.js-field-tax-rule').val())
+                    tax_rule: parseInt($thr.find('.js-field-tax-rule').val()),
+                    tax_rule_id: parseInt($thr.find('.js-field-tax-rule').val())
                 }
             });
 

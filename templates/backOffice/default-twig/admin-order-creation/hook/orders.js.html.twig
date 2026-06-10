@@ -42,13 +42,13 @@
         <td>
             <div class="mb-3">
                 <div class="input-group">
-                    <input class="form-control js-product-price-without-tax" data-url="{{ path('admin.product.calculate-raw-price', {action: 'to_tax'}) }}" type="number" min="0" step="0.000001" name="admin-order-creation-create[product_price_without_tax][]" value="0" />
+                    <input class="form-control js-product-price-without-tax" data-url="{{ path('admin.product.calculate-price', {action: 'untaxed_to_taxed'}) }}" type="number" min="0" step="0.000001" name="admin-order-creation-create[product_price_without_tax][]" value="0" />
                     <span class="input-group-text">HT</span>
                 </div>
             </div>
             <div class="mb-3">
                 <div class="input-group">
-                    <input class="form-control js-product-price-with-tax" data-url="{{ path('admin.product.calculate-raw-price', {action: 'from_tax'}) }}" type="number" min="0" step="0.000001" name="admin-order-creation-create[product_price_with_tax][]" value="0" />
+                    <input class="form-control js-product-price-with-tax" data-url="{{ path('admin.product.calculate-price', {action: 'taxed_to_untaxed'}) }}" type="number" min="0" step="0.000001" name="admin-order-creation-create[product_price_with_tax][]" value="0" />
                     <span class="input-group-text">TTC</span>
                 </div>
             </div>
