@@ -28,6 +28,7 @@ use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpFoundation\Response;
 use Thelia\Controller\Admin\BaseAdminController;
 use Thelia\Core\Event\Order\OrderEvent;
 use Thelia\Core\Event\TheliaEvents;
@@ -44,6 +45,8 @@ use Thelia\Model\CountryQuery;
 use Thelia\Model\CurrencyQuery;
 use Thelia\Model\Customer;
 use Thelia\Model\CustomerQuery;
+use Thelia\Model\CustomerTitleQuery;
+use Thelia\Model\ModuleQuery;
 use Thelia\Model\Map\AddressTableMap;
 use Thelia\Model\Map\OrderTableMap;
 use Thelia\Model\Map\ProductI18nTableMap;
@@ -59,10 +62,14 @@ use Thelia\Model\ProductI18n;
 use Thelia\Model\ProductQuery;
 use Thelia\Model\ProductSaleElementsQuery;
 use Thelia\Model\TaxRuleI18n;
+use Thelia\Model\TaxRuleQuery;
+use Thelia\Module\BaseModule;
 use Thelia\Domain\Taxation\TaxEngine\TaxEngine;
 use Thelia\Tools\I18n;
+use Thelia\Tools\MoneyFormat;
 use Thelia\Tools\URL;
 use Symfony\Component\Routing\Attribute\Route;
+use Twig\Environment;
 
 
 #[Route('/admin/admin-order-creation/ajax', name: 'admin_order_creation_ajax')]
@@ -77,6 +84,7 @@ class OrderController extends BaseAdminController
         EventDispatcherInterface $eventDispatcher,
         RequestStack $requestStack,
         SecurityContext $securityContext,
+        Environment $twig,
         #[Autowire(service: TaxEngine::class)]
         TaxEngine $taxEngine
     )
@@ -179,18 +187,50 @@ class OrderController extends BaseAdminController
         }
 
         if ($order->getId()) {
+            if ($this->useTwigBackOffice()) {
+                return new Response($twig->render(
+                    '@AdminOrderCreationModule/backOffice/default-twig/AdminOrderCreation/order-create-modal-success.html.twig',
+                    ['order' => $order]
+                ));
+            }
+
             return $this->render('admin-order-creation/ajax/order-create-modal-success', [
                 'order' => $order
             ]);
-        } else {
-            return $this->render('admin-order-creation/ajax/order-create-modal', [
-                'order' => $order,
-                'hasCreditNoteModule' => $this->hasCreditNoteModule(),
-                'configNewCreditNoteStatusId' => AdminOrderCreation::getConfigValue(AdminOrderCreation::CONFIG_KEY_DEFAULT_NEW_CREDIT_NOTE_STATUS_ID),
-                'configNewCreditNoteTypeId' => AdminOrderCreation::getConfigValue(AdminOrderCreation::CONFIG_KEY_DEFAULT_NEW_CREDIT_NOTE_TYPE_ID),
-                'configPayedOrderMinimumStatusId' => AdminOrderCreation::getConfigValue(AdminOrderCreation::CONFIG_KEY_PAYED_ORDER_MINIMUM_STATUS_ID)
-            ]);
         }
+
+        if ($this->useTwigBackOffice()) {
+            return new Response($twig->render(
+                '@AdminOrderCreationModule/backOffice/default-twig/AdminOrderCreation/order-create-modal.html.twig',
+                $this->buildModalContext($order, $formValidate, $request, $errorMessage)
+            ));
+        }
+
+        return $this->render('admin-order-creation/ajax/order-create-modal', [
+            'order' => $order,
+            'hasCreditNoteModule' => $this->hasCreditNoteModule(),
+            'configNewCreditNoteStatusId' => AdminOrderCreation::getConfigValue(AdminOrderCreation::CONFIG_KEY_DEFAULT_NEW_CREDIT_NOTE_STATUS_ID),
+            'configNewCreditNoteTypeId' => AdminOrderCreation::getConfigValue(AdminOrderCreation::CONFIG_KEY_DEFAULT_NEW_CREDIT_NOTE_TYPE_ID),
+            'configPayedOrderMinimumStatusId' => AdminOrderCreation::getConfigValue(AdminOrderCreation::CONFIG_KEY_PAYED_ORDER_MINIMUM_STATUS_ID)
+        ]);
+    }
+
+    /**
+     * The default-twig back-office cannot render the legacy Smarty fragments:
+     * BaseAdminController::render() resolves its parser against the active admin
+     * template only, so the choice is made here, on the same criterion.
+     */
+    protected function useTwigBackOffice(): bool
+    {
+        $adminTemplatePath = $this->templateHelper->getActiveAdminTemplate()->getAbsolutePath();
+
+        foreach ($this->parserResolver->getParsers() as $parser) {
+            if ('html.twig' === $parser->getFileExtension()) {
+                return $parser->supportTemplateRender($adminTemplatePath, 'base');
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -298,6 +338,369 @@ class OrderController extends BaseAdminController
     protected function hasCreditNoteModule()
     {
         return class_exists('\CreditNote\CreditNote');
+    }
+
+    /**
+     * Builds the whole view data of the Twig modal fragment. Each block reproduces
+     * one of the Smarty {loop} of admin-order-creation/ajax/order-create-modal.html.
+     */
+    protected function buildModalContext(Order $order, Form $form, Request $request, array $errorMessages)
+    {
+        $locale = $order->getLang()->getLocale();
+        $moneyFormat = MoneyFormat::getInstance($request);
+        $customer = $order->getCustomer();
+
+        // {loop type="currency"}
+        $selectedCurrencyId = (int) $form->get('currency_id')->getData();
+        $currencies = [];
+        foreach (CurrencyQuery::create()->filterByVisible(1)->orderByPosition()->find() as $currency) {
+            if (!$selectedCurrencyId && $currency->getByDefault()) {
+                $selectedCurrencyId = $currency->getId();
+            }
+            $currencies[] = [
+                'id' => $currency->getId(),
+                'symbol' => $currency->getSymbol(),
+            ];
+        }
+
+        // {loop type="country"} (shared by the top select and both address selects)
+        $countries = [];
+        $defaultCountryId = 0;
+        foreach (CountryQuery::create()->filterByVisible(1)->orderById()->joinWithI18n($locale)->find() as $country) {
+            if ($country->getByDefault()) {
+                $defaultCountryId = $country->getId();
+            }
+            $countries[] = [
+                'id' => $country->getId(),
+                'title' => $country->getTitle(),
+            ];
+        }
+        $selectedCountryId = ((int) $form->get('country_id')->getData()) ?: $defaultCountryId;
+
+        // {loop type="order-status"}
+        $ignoreStatus = (bool) $form->get('credit_note_id')->getData();
+        $minimumStatusId = (int) AdminOrderCreation::getConfigValue(AdminOrderCreation::CONFIG_KEY_PAYED_ORDER_MINIMUM_STATUS_ID);
+        $statuses = [];
+        foreach (OrderStatusQuery::create()->orderByPosition()->find() as $status) {
+            if ($ignoreStatus && $status->getId() < $minimumStatusId) {
+                continue;
+            }
+            $statuses[] = [
+                'id' => $status->getId(),
+                'label' => $status->setLocale($locale)->getTitle() ?: $status->getCode(),
+                'color' => $status->getColor(),
+                'selected' => $status->getId() === (int) $order->getStatusId(),
+            ];
+        }
+
+        // {loop type="address" customer=...}
+        $addresses = [];
+        if (null !== $customer) {
+            foreach (AddressQuery::create()->filterByCustomerId($customer->getId())->find() as $address) {
+                $addresses[] = [
+                    'id' => $address->getId(),
+                    'firstname' => $address->getFirstname(),
+                    'lastname' => $address->getLastname(),
+                    'address1' => $address->getAddress1(),
+                    'city' => $address->getCity(),
+                    'zipcode' => $address->getZipcode(),
+                ];
+            }
+        }
+
+        // {loop type="title"}
+        $titles = [];
+        foreach (CustomerTitleQuery::create()->orderByPosition()->find() as $title) {
+            $titles[] = [
+                'id' => $title->getId(),
+                'long' => $title->setLocale($locale)->getLong(),
+            ];
+        }
+
+        // {loop type="tax-rule"} (default loop order is alphabetical on the i18n title)
+        $taxRules = [];
+        foreach (TaxRuleQuery::create()->find() as $taxRule) {
+            $taxRules[] = [
+                'id' => $taxRule->getId(),
+                'title' => (string) $taxRule->setLocale($locale)->getTitle(),
+            ];
+        }
+        usort($taxRules, static function (array $a, array $b) {
+            return strcasecmp($a['title'], $b['title']);
+        });
+
+        // product lines, keyed like the submitted product_id collection
+        $productIds = $form->get('product_id')->getData() ?: [];
+        $productLineMaxKey = 0;
+        foreach (array_keys($productIds) as $key) {
+            $productLineMaxKey = max($productLineMaxKey, (int) $key);
+        }
+
+        $productLines = [];
+        foreach ($order->getOrderProducts() as $key => $orderProduct) {
+            $productLines[] = $this->buildProductLine((int) $key, $orderProduct, $locale);
+        }
+
+        $orderCurrencyId = $order->getCurrency()->getId();
+
+        return array_merge([
+            'errorMessages' => $errorMessages,
+            'currencies' => $currencies,
+            'selectedCurrencyId' => $selectedCurrencyId,
+            'countries' => $countries,
+            'selectedCountryId' => $selectedCountryId,
+            'statuses' => $statuses,
+            'customer' => null !== $customer ? [
+                'id' => $customer->getId(),
+                'ref' => $customer->getRef(),
+                'firstname' => $customer->getFirstname(),
+                'lastname' => $customer->getLastname(),
+            ] : null,
+            'deliveryModules' => $this->buildModuleOptions(BaseModule::DELIVERY_MODULE_TYPE, (int) $form->get('delivery_module_id')->getData(), $locale),
+            'paymentModules' => $this->buildModuleOptions(BaseModule::PAYMENT_MODULE_TYPE, (int) $form->get('payment_module_id')->getData(), $locale),
+            'addresses' => $addresses,
+            'invoiceAddressId' => (int) $form->get('invoice_address_id')->getData(),
+            'deliveryAddressId' => (int) $form->get('delivery_address_id')->getData(),
+            'titles' => $titles,
+            'invoiceAddress' => $this->buildAddressFormValues($form, 'invoice_address', $defaultCountryId),
+            'deliveryAddress' => $this->buildAddressFormValues($form, 'delivery_address', $defaultCountryId),
+            'productLineMaxKey' => $productLineMaxKey,
+            'productLines' => $productLines,
+            'shippingPrice' => (string) $form->get('shipping_price')->getData(),
+            'shippingPriceWithTax' => (string) $form->get('shipping_price_with_tax')->getData(),
+            'taxRules' => $taxRules,
+            'selectedShippingTaxRuleId' => (int) $form->get('shipping_tax_rule_id')->getData(),
+            'reduction' => (string) $form->get('reduction')->getData(),
+            'reductionType' => ((int) $form->get('reduction_type')->getData()) ?: 1,
+            'hasCreditNoteModule' => $this->hasCreditNoteModule(),
+            'totals' => [
+                'withoutTax' => $moneyFormat->formatByCurrency((float) $order->getTotalAmountWithoutTax(), null, null, null, $orderCurrencyId),
+                'tax' => $moneyFormat->formatByCurrency((float) ($order->getTotalAmountWithTax() - $order->getTotalAmountWithoutTax()), null, null, null, $orderCurrencyId),
+                'withTax' => $moneyFormat->formatByCurrency((float) $order->getTotalAmountWithTax(), null, null, null, $orderCurrencyId),
+            ],
+        ], $this->buildCreditNoteContext($order, $form, $moneyFormat, $locale));
+    }
+
+    /**
+     * Reproduces the {loop type="module"} selects (module_type filter, active only).
+     */
+    protected function buildModuleOptions($type, $selectedId, $locale)
+    {
+        $options = [];
+        foreach (ModuleQuery::create()->filterByType($type)->filterByActivate(1)->orderByPosition()->find() as $module) {
+            $options[] = [
+                'id' => $module->getId(),
+                'title' => $module->setLocale($locale)->getTitle() ?: $module->getCode(),
+                'selected' => $module->getId() === $selectedId,
+            ];
+        }
+
+        return $options;
+    }
+
+    protected function buildAddressFormValues(Form $form, $prefix, $defaultCountryId)
+    {
+        return [
+            'titleId' => (int) $form->get($prefix . '_title')->getData(),
+            'firstname' => (string) $form->get($prefix . '_firstname')->getData(),
+            'lastname' => (string) $form->get($prefix . '_lastname')->getData(),
+            'company' => (string) $form->get($prefix . '_company')->getData(),
+            'address1' => (string) $form->get($prefix . '_address1')->getData(),
+            'address2' => (string) $form->get($prefix . '_address2')->getData(),
+            'zipcode' => (string) $form->get($prefix . '_zipcode')->getData(),
+            'city' => (string) $form->get($prefix . '_city')->getData(),
+            'countryId' => ((int) $form->get($prefix . '_country_id')->getData()) ?: $defaultCountryId,
+            'phone' => (string) $form->get($prefix . '_phone')->getData(),
+            'cellphone' => (string) $form->get($prefix . '_cellphone')->getData(),
+        ];
+    }
+
+    /**
+     * Reproduces the {loop type="credit-note"} / "credit-note-status" / "credit-note-type"
+     * blocks. The CreditNote module is optional: everything stays behind the class guard.
+     */
+    protected function buildCreditNoteContext(Order $order, Form $form, MoneyFormat $moneyFormat, $locale)
+    {
+        $context = [
+            'creditNotes' => [],
+            'selectedCreditNote' => null,
+            'creditNoteStatuses' => [],
+            'creditNoteTypes' => [],
+        ];
+
+        $customer = $order->getCustomer();
+
+        if (!$this->hasCreditNoteModule() || null === $customer) {
+            return $context;
+        }
+
+        $selectedCreditNoteId = (int) $form->get('credit_note_id')->getData();
+        $selectedCreditNote = null;
+
+        $creditNotes = CreditNoteQuery::create()
+            ->filterByCustomerId($customer->getId())
+            ->useCreditNoteStatusQuery()
+                ->filterByInvoiced(true)
+                ->filterByUsed(false)
+            ->endUse()
+            ->find();
+
+        foreach ($creditNotes as $creditNote) {
+            if ($creditNote->getId() === $selectedCreditNoteId) {
+                $selectedCreditNote = $creditNote;
+            }
+
+            $context['creditNotes'][] = [
+                'id' => $creditNote->getId(),
+                'ref' => $creditNote->getRef(),
+                'invoiceRef' => $creditNote->getInvoiceRef(),
+                'amount' => $moneyFormat->formatByCurrency((float) $creditNote->getTotalPriceWithTax(), null, null, null, $creditNote->getCurrencyId()),
+                'selected' => $creditNote->getId() === $selectedCreditNoteId,
+            ];
+        }
+
+        if (null === $selectedCreditNote) {
+            return $context;
+        }
+
+        $creditNoteCurrencyId = $selectedCreditNote->getCurrencyId();
+        $rawDiff = $order->getTotalAmountWithTax() - (float) $selectedCreditNote->getTotalPriceWithTax();
+
+        $context['selectedCreditNote'] = [
+            'ref' => $selectedCreditNote->getRef(),
+            'amount' => $moneyFormat->formatByCurrency((float) $selectedCreditNote->getTotalPriceWithTax(), null, null, null, $creditNoteCurrencyId),
+            'diffAmount' => round($rawDiff, 2),
+            'diffFormatted' => $moneyFormat->formatByCurrency(abs($rawDiff), null, null, null, $creditNoteCurrencyId),
+        ];
+
+        if (round($rawDiff, 2) < 0) {
+            $selectedStatusId = ((int) $form->get('credit_note_status_id')->getData())
+                ?: (int) AdminOrderCreation::getConfigValue(AdminOrderCreation::CONFIG_KEY_DEFAULT_NEW_CREDIT_NOTE_STATUS_ID);
+
+            foreach (CreditNoteStatusQuery::create()->filterByInvoiced(true)->orderByPosition()->find() as $creditNoteStatus) {
+                $context['creditNoteStatuses'][] = [
+                    'id' => $creditNoteStatus->getId(),
+                    'label' => $creditNoteStatus->setLocale($locale)->getTitle() ?: $creditNoteStatus->getCode(),
+                    'color' => $creditNoteStatus->getColor(),
+                    'selected' => $creditNoteStatus->getId() === $selectedStatusId,
+                ];
+            }
+
+            $selectedTypeId = ((int) $form->get('credit_note_type_id')->getData())
+                ?: (int) AdminOrderCreation::getConfigValue(AdminOrderCreation::CONFIG_KEY_DEFAULT_NEW_CREDIT_NOTE_TYPE_ID);
+
+            foreach (CreditNoteTypeQuery::create()->orderByPosition()->find() as $creditNoteType) {
+                $context['creditNoteTypes'][] = [
+                    'id' => $creditNoteType->getId(),
+                    'label' => $creditNoteType->setLocale($locale)->getTitle() ?: $creditNoteType->getCode(),
+                    'color' => $creditNoteType->getColor(),
+                    'selected' => $creditNoteType->getId() === $selectedTypeId,
+                ];
+            }
+        }
+
+        return $context;
+    }
+
+    /**
+     * Reproduces the per-line Smarty {loop}s of include/product-line.html:
+     * product_sale_elements (per id and per product), product, attribute_combination.
+     */
+    protected function buildProductLine($key, OrderProduct $orderProduct, $locale)
+    {
+        $line = [
+            'key' => $key,
+            'productId' => null,
+            'productRef' => '',
+            'productTitle' => '',
+            'taxRuleId' => null,
+            'pseOptions' => [],
+            'selectedPseId' => null,
+            'priceWithoutTax' => '0.000000',
+            'priceWithTax' => '0.000000',
+            'quantity' => (int) $orderProduct->getQuantity(),
+            'totalWithoutTax' => '0.000000',
+            'totalWithTax' => '0.000000',
+        ];
+
+        $currentPse = $orderProduct->getProductSaleElementsId()
+            ? ProductSaleElementsQuery::create()->findPk($orderProduct->getProductSaleElementsId())
+            : null;
+
+        if (null === $currentPse) {
+            return $line;
+        }
+
+        $product = $currentPse->getProduct();
+
+        $line['productId'] = $product->getId();
+        $line['productRef'] = $product->getRef();
+        $line['productTitle'] = (string) $product->setLocale($locale)->getTitle();
+        $line['taxRuleId'] = $product->getTaxRuleId();
+
+        $firstPseId = null;
+        $hasCombinations = false;
+        $pseOptions = [];
+
+        $productSaleElements = ProductSaleElementsQuery::create()
+            ->filterByProductId($product->getId())
+            ->orderById()
+            ->find();
+
+        foreach ($productSaleElements as $productSaleElement) {
+            if (null === $firstPseId) {
+                $firstPseId = $productSaleElement->getId();
+            }
+
+            $labels = [];
+            foreach ($productSaleElement->getAttributeCombinations() as $attributeCombination) {
+                $labels[] = $attributeCombination->getAttribute()->setLocale($locale)->getTitle()
+                    . ' : '
+                    . $attributeCombination->getAttributeAv()->setLocale($locale)->getTitle();
+            }
+
+            if (count($labels)) {
+                $hasCombinations = true;
+            }
+
+            $pseOptions[] = [
+                'id' => $productSaleElement->getId(),
+                'label' => implode(', ', $labels),
+                'quantity' => $productSaleElement->getQuantity(),
+                'ref' => $productSaleElement->getRef(),
+                'color' => $productSaleElement->getQuantity() > 0 ? '#e6ffe6' : '#ffe6e6',
+            ];
+        }
+
+        $selectedPseId = $orderProduct->getProductSaleElementsId() ?: $firstPseId;
+
+        foreach ($pseOptions as &$pseOption) {
+            $pseOption['selected'] = $pseOption['id'] === $selectedPseId;
+        }
+        unset($pseOption);
+
+        $line['selectedPseId'] = $selectedPseId;
+        $line['pseOptions'] = $hasCombinations ? $pseOptions : [];
+
+        $priceWithoutTax = $orderProduct->getWasInPromo()
+            ? (float) $orderProduct->getPromoPrice()
+            : (float) $orderProduct->getPrice();
+
+        $taxes = 0.0;
+        foreach ($orderProduct->getOrderProductTaxes() as $orderProductTax) {
+            $taxes += $orderProduct->getWasInPromo()
+                ? (float) $orderProductTax->getPromoAmount()
+                : (float) $orderProductTax->getAmount();
+        }
+
+        $quantity = (int) $orderProduct->getQuantity();
+
+        $line['priceWithoutTax'] = number_format($priceWithoutTax, 6, '.', '');
+        $line['priceWithTax'] = number_format($priceWithoutTax + $taxes, 6, '.', '');
+        $line['totalWithoutTax'] = number_format($priceWithoutTax * $quantity, 6, '.', '');
+        $line['totalWithTax'] = number_format(($priceWithoutTax + $taxes) * $quantity, 6, '.', '');
+
+        return $line;
     }
 
     protected function performOrder(
