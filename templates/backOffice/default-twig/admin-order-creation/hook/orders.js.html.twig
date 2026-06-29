@@ -130,7 +130,17 @@
         }
         modal.dataset.aocBound = '1';
 
-        var bsModal = bootstrap.Modal.getOrCreateInstance(modal);
+        // Resolve the Bootstrap modal lazily: this fragment runs as a deferred
+        // module script and window.bootstrap may not be assigned yet when it
+        // first executes. Touching bootstrap.Modal at init time would throw and
+        // abort the whole driver, leaving the "Create new order" button inert.
+        var bsModal = null;
+        function getBsModal() {
+            if (bsModal === null && window.bootstrap && window.bootstrap.Modal) {
+                bsModal = window.bootstrap.Modal.getOrCreateInstance(modal);
+            }
+            return bsModal;
+        }
         var currentRequest = null;        // AbortController for the modal reload POST
         var refreshTimer = null;
         var priceController = null;       // AbortController for product price calc
@@ -696,7 +706,10 @@
             if (!btn) {
                 return;
             }
-            bsModal.show();
+            var instance = getBsModal();
+            if (instance) {
+                instance.show();
+            }
             loadAjax({
                 'admin-order-creation-create[action]': 'open',
                 'admin-order-creation-create[customer_id]': btn.dataset.customerId,
