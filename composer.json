@@ -4,8 +4,10 @@
   "license": "MIT",
   "type": "thelia-module",
   "require": {
-    "thelia/installer": "~1.1",
-    "thelia/credit-note-module": "dev-twig"
+    "thelia/installer": "~1.1"
+  },
+  "suggest": {
+    "thelia/credit-note-module": "Enables credit note integration in the order edit screen"
   },
   "extra": {
     "installer-name": "AdminOrderCreation"
