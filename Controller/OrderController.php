@@ -722,7 +722,6 @@ class OrderController extends BaseAdminController
             ->performCustomer($order, $formValidate)
             ->performInvoiceAddress($order, $formValidate)
             ->performDeliveryAddress($order, $formValidate)
-            ->performDeliveryAddress($order, $formValidate)
             ->performProducts($order, $formValidate, $eventDispatcher, $requestStack, $securityContext, $taxEngine)
             ->performShipping($order, $formValidate)
             ->performGlobalReduction($order, $formValidate)
