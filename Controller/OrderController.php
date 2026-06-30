@@ -250,6 +250,8 @@ class OrderController extends BaseAdminController
             ->groupById()
             ->limit(20);
 
+        $request = $requestStack->getCurrentRequest();
+
         $this->whereConcatRegex($customerQuery, [
             'customer.REF',
             'customer.FIRSTNAME',
@@ -257,7 +259,7 @@ class OrderController extends BaseAdminController
             'customer.EMAIL',
             'address.COMPANY',
             'address.PHONE'
-        ], $requestStack->getCurrentRequest()->get('q'));
+        ], $request->attributes->get('q', $request->query->get('q', $request->request->get('q'))));
 
         $customerQuery
             ->withColumn(AddressTableMap::COL_COMPANY, 'COMPANY')
@@ -302,8 +304,10 @@ class OrderController extends BaseAdminController
 
         $productQuery = ProductQuery::create();
 
+        $request = $requestStack->getCurrentRequest();
+
         $productQuery->useI18nQuery(
-            $requestStack->getCurrentRequest()->getSession()->getAdminEditionLang()->getLocale()
+            $request->getSession()->getAdminEditionLang()->getLocale()
         );
 
         $productQuery
@@ -312,7 +316,7 @@ class OrderController extends BaseAdminController
         $this->whereConcatRegex($productQuery, array(
             'product.REF',
             'product_i18n.TITLE'
-        ), $requestStack->getCurrentRequest()->get('q'));
+        ), $request->attributes->get('q', $request->query->get('q', $request->request->get('q'))));
 
         $productQuery->setLimit(10);
 
