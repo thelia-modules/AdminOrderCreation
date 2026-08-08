@@ -1,10 +1,10 @@
 {
   "name": "thelia/admin-order-creation",
   "description": "A module to create orders from the Thelia back-office.",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "type": "thelia-module",
   "require": {
-    "thelia/installer": "~1.1"
+    "thelia/installer": "^1.6"
   },
   "suggest": {
     "thelia/credit-note-module": "Enables credit note integration in the order edit screen"
