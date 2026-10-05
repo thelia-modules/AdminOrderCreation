@@ -35,10 +35,8 @@ use Thelia\Core\Event\TheliaEvents;
 use Thelia\Core\HttpFoundation\Request;
 use Thelia\Core\Security\AccessManager;
 use Thelia\Core\Security\Resource\AdminResources;
-use Thelia\Core\Security\SecurityContext;
-use Thelia\Core\Template\Loop\ProductSaleElements;
+use Thelia\Core\Template\Loop\LoopExecutor;
 use Thelia\Core\Template\ParserContext;
-use Thelia\Core\Translation\Translator;
 use Thelia\Model\AddressQuery;
 use Thelia\Model\Cart;
 use Thelia\Model\CountryQuery;
@@ -64,7 +62,6 @@ use Thelia\Model\ProductSaleElementsQuery;
 use Thelia\Model\TaxRuleI18n;
 use Thelia\Model\TaxRuleQuery;
 use Thelia\Module\BaseModule;
-use Thelia\Domain\Taxation\TaxEngine\TaxEngine;
 use Thelia\Tools\I18n;
 use Thelia\Tools\MoneyFormat;
 use Thelia\Tools\URL;
@@ -83,10 +80,9 @@ class OrderController extends BaseAdminController
         ParserContext $parserContext,
         EventDispatcherInterface $eventDispatcher,
         RequestStack $requestStack,
-        SecurityContext $securityContext,
         Environment $twig,
-        #[Autowire(service: TaxEngine::class)]
-        TaxEngine $taxEngine
+        #[Autowire(service: LoopExecutor::class)]
+        LoopExecutor $loopExecutor
     )
     {
         if (null !== $response = $this->checkAuth(AdminResources::ORDER, [], AccessManager::CREATE)) {
@@ -101,7 +97,7 @@ class OrderController extends BaseAdminController
 
         $formValidate = $this->validateForm($form, 'post');
 
-        $this->performOrder($order, $formValidate, $eventDispatcher, $requestStack, $securityContext, $taxEngine);
+        $this->performOrder($order, $formValidate, $requestStack, $loopExecutor);
 
         $parserContext->addForm($form);
 
@@ -710,10 +706,8 @@ class OrderController extends BaseAdminController
     protected function performOrder(
         Order $order,
         Form $formValidate,
-        EventDispatcherInterface $eventDispatcher,
         RequestStack $requestStack,
-        SecurityContext $securityContext,
-        TaxEngine $taxEngine
+        LoopExecutor $loopExecutor
     )
     {
         $this
@@ -722,7 +716,7 @@ class OrderController extends BaseAdminController
             ->performCustomer($order, $formValidate)
             ->performInvoiceAddress($order, $formValidate)
             ->performDeliveryAddress($order, $formValidate)
-            ->performProducts($order, $formValidate, $eventDispatcher, $requestStack, $securityContext, $taxEngine)
+            ->performProducts($order, $formValidate, $requestStack, $loopExecutor)
             ->performShipping($order, $formValidate)
             ->performGlobalReduction($order, $formValidate)
             ->performPaymentModule($order, $formValidate)
@@ -1074,10 +1068,8 @@ class OrderController extends BaseAdminController
     protected function performProducts(
         Order $order,
         Form $form,
-        EventDispatcherInterface $eventDispatcher,
         RequestStack $requestStack,
-        SecurityContext $securityContext,
-        TaxEngine $taxEngine,
+        LoopExecutor $loopExecutor,
     )
     {
         $country = $this->getCountry($form);
@@ -1104,39 +1096,23 @@ class OrderController extends BaseAdminController
                 $product->getId()
             );
 
-            $productSaleElementsLoop = new ProductSaleElements($taxEngine);
-            $productSaleElementsLoop->init($this->container, $requestStack, $eventDispatcher, $securityContext, Translator::getInstance(), [], "");
+            $loopArguments = [
+                'currency' => $currency->getId(),
+                'product' => $product->getId(),
+            ];
 
-            if (isset($productSaleElementIds[$key])) {
-                if (null !== ProductSaleElementsQuery::create()
-                        ->filterByProductId($product->getId())
-                        ->filterById($productSaleElementIds[$key])
-                        ->findOne()) {
-                    $productSaleElementsLoop->initializeArgs([
-                        'name' => 'product_sale_elements',
-                        'type' => 'product_sale_elements',
-                        'id' => $productSaleElementIds[$key],
-                        'currency' => $currency->getId()
-                    ]);
-                } else {
-                    $productSaleElementsLoop->initializeArgs([
-                        'name' => 'product_sale_elements',
-                        'type' => 'product_sale_elements',
-                        'product' => $product->getId(),
-                        'currency' => $currency->getId()
-                    ]);
-                }
-            } else {
-                $productSaleElementsLoop->initializeArgs([
-                    'name' => 'product_sale_elements',
-                    'type' => 'product_sale_elements',
-                    'product' => $product->getId(),
-                    'currency' => $currency->getId()
-                ]);
+            if (isset($productSaleElementIds[$key])
+                && null !== ProductSaleElementsQuery::create()
+                    ->filterByProductId($product->getId())
+                    ->filterById($productSaleElementIds[$key])
+                    ->findOne()) {
+                $loopArguments = [
+                    'id' => $productSaleElementIds[$key],
+                    'currency' => $currency->getId(),
+                ];
             }
 
-            $pagination = null;
-            $results = $productSaleElementsLoop->exec($pagination);
+            $results = $loopExecutor->execute('product_sale_elements', $loopArguments);
 
             /** @var \Thelia\Model\ProductSaleElements $productSaleElement */
             $productSaleElement = $results->getResultDataCollection()[0];
@@ -1174,14 +1150,14 @@ class OrderController extends BaseAdminController
                 ->setPostscriptum($productI18n->getPostscriptum())
                 ->setVirtual($product->getVirtual())
                 ->setQuantity($quantities[$key])
-                ->setWasNew($productSaleElement->getNewness())
+                ->setWasNew($productSaleElement->getNewness() ?? 0)
                 ->setWeight($productSaleElement->getWeight())
                 ->setTaxRuleTitle($taxRuleI18n->getTitle())
                 ->setTaxRuleDescription($taxRuleI18n->getDescription())
                 ->setEanCode($productSaleElement->getEanCode())
                 ->setPrice($price)
                 ->setPromoPrice($promoPrice)
-                ->setWasInPromo($productSaleElement->getPromo())
+                ->setWasInPromo($productSaleElement->getPromo() ?? 0)
             ;
 
             /** @var OrderProductTax $tax */
