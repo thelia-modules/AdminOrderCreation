@@ -34,6 +34,7 @@ use Thelia\Core\Event\Order\OrderEvent;
 use Thelia\Core\Event\TheliaEvents;
 use Thelia\Core\HttpFoundation\Request;
 use Thelia\Core\Security\AccessManager;
+use Thelia\Core\Security\Exception\TokenAuthenticationException;
 use Thelia\Core\Security\Resource\AdminResources;
 use Thelia\Core\Template\Loop\LoopExecutor;
 use Thelia\Core\Template\ParserContext;
@@ -87,6 +88,19 @@ class OrderController extends BaseAdminController
     {
         if (null !== $response = $this->checkAuth(AdminResources::ORDER, [], AccessManager::CREATE)) {
             return $response;
+        }
+
+        // Opening and refreshing the window only compute an order in memory; creating it
+        // writes one, so that request has to carry the token the window was rendered with.
+        if ('create' === ($request->request->all(OrderCreateForm::getName())['action'] ?? null)) {
+            try {
+                $this->getTokenProvider()->checkRequestToken($request);
+            } catch (TokenAuthenticationException) {
+                return new Response(
+                    $this->getTranslator()->trans('Invalid security token, please reload the page.', [], AdminOrderCreation::DOMAIN_NAME),
+                    Response::HTTP_FORBIDDEN
+                );
+            }
         }
 
         $order = new Order();
@@ -199,6 +213,7 @@ class OrderController extends BaseAdminController
             return new Response($twig->render(
                 '@AdminOrderCreationModule/backOffice/default-twig/AdminOrderCreation/order-create-modal.html.twig',
                 $this->buildModalContext($order, $formValidate, $request, $errorMessage)
+                    + ['csrfToken' => $this->getTokenProvider()->assignToken()]
             ));
         }
 
@@ -207,7 +222,8 @@ class OrderController extends BaseAdminController
             'hasCreditNoteModule' => $this->hasCreditNoteModule(),
             'configNewCreditNoteStatusId' => AdminOrderCreation::getConfigValue(AdminOrderCreation::CONFIG_KEY_DEFAULT_NEW_CREDIT_NOTE_STATUS_ID),
             'configNewCreditNoteTypeId' => AdminOrderCreation::getConfigValue(AdminOrderCreation::CONFIG_KEY_DEFAULT_NEW_CREDIT_NOTE_TYPE_ID),
-            'configPayedOrderMinimumStatusId' => AdminOrderCreation::getConfigValue(AdminOrderCreation::CONFIG_KEY_PAYED_ORDER_MINIMUM_STATUS_ID)
+            'configPayedOrderMinimumStatusId' => AdminOrderCreation::getConfigValue(AdminOrderCreation::CONFIG_KEY_PAYED_ORDER_MINIMUM_STATUS_ID),
+            'csrfToken' => $this->getTokenProvider()->assignToken(),
         ]);
     }
 
