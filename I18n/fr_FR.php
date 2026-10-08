@@ -1,4 +1,4 @@
 <?php
 return array(
-    // 'an english string' => 'La traduction française de la chaine',
+    'Invalid security token, please reload the page.' => 'Jeton de sécurité invalide, veuillez recharger la page.',
 );
