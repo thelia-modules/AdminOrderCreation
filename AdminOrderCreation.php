@@ -29,7 +29,20 @@ class AdminOrderCreation extends BaseModule
     const CONFIG_DEFAULT_VALUE_PAYED_ORDER_MINIMUM_STATUS_ID = 2;
     const CONFIG_DEFAULT_VALUE_INVOICE_REF_TYPE = 0;
 
-    public function update($currentVersion, $newVersion, ConnectionInterface $con = null): void
+    public function postActivation(?ConnectionInterface $con = null): void
+    {
+        $this->initializeDefaultConfiguration();
+    }
+
+    public function update($currentVersion, $newVersion, ?ConnectionInterface $con = null): void
+    {
+        $this->initializeDefaultConfiguration();
+    }
+
+    /**
+     * Every key keeps the value a merchant already set; only the missing ones get their default.
+     */
+    private function initializeDefaultConfiguration(): void
     {
         if (null === self::getConfigValue(self::CONFIG_KEY_DEFAULT_NEW_CREDIT_NOTE_STATUS_ID)) {
             self::setConfigValue(
