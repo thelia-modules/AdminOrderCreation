@@ -218,11 +218,19 @@ class OrderController extends BaseAdminController
      */
     protected function useTwigBackOffice(): bool
     {
-        $adminTemplatePath = $this->templateHelper->getActiveAdminTemplate()->getAbsolutePath();
+        $adminTemplate = $this->templateHelper->getActiveAdminTemplate();
 
         foreach ($this->parserResolver->getParsers() as $parser) {
             if ('html.twig' === $parser->getFileExtension()) {
-                return $parser->supportTemplateRender($adminTemplatePath, 'base');
+                if (!$parser->supportTemplateRender($adminTemplate->getAbsolutePath(), 'base')) {
+                    return false;
+                }
+
+                // The fragment is rendered by Twig directly, not by BaseAdminController::render(): without a template
+                // definition on the parser, hook() dispatches "hook..<name>" and no module hook is ever called.
+                $parser->setTemplateDefinition($adminTemplate);
+
+                return true;
             }
         }
 
