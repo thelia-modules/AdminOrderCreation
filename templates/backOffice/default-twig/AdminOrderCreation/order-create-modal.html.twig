@@ -85,9 +85,11 @@
             </div>
         </div>
 
-        {# Extra fields of other modules: anything they render inside the form is posted with it #}
+        {# Extra fields of other modules: anything rendered here is inside the form and posted with it. #}
+        {# Name your field outside the admin-order-creation-create[...] namespace: that form refuses extra fields. #}
+        {# This fragment is rendered again on every refresh: read the current request to keep the value. #}
         <div class="col-12">
-            {{ hook('admin-order-creation.modal-options') }}
+            {{ hook('admin-order-creation.modal-options', {customer_id: customer ? customer.id : null}) }}
         </div>
 
         {# invoice address #}
