@@ -85,6 +85,11 @@
             </div>
         </div>
 
+        {# Extra fields of other modules: anything they render inside the form is posted with it #}
+        <div class="col-12">
+            {{ hook('admin-order-creation.modal-options') }}
+        </div>
+
         {# invoice address #}
         <div class="col-md-6">
             <div class="card mb-3">
