@@ -88,7 +88,7 @@ class AdminOrderCreation extends BaseModule
     public static function configureServices(ServicesConfigurator $servicesConfigurator): void
     {
         $servicesConfigurator->load(self::getModuleCode().'\\', __DIR__)
-            ->exclude([__DIR__.'/I18n/*'])
+            ->exclude([__DIR__.'/I18n/*', __DIR__.'/tests/*', __DIR__.'/vendor/*'])
             ->autowire(true)
             ->autoconfigure(true);
     }
