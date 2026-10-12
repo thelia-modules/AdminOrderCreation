@@ -11,6 +11,7 @@ namespace AdminOrderCreation\Controller;
 use AdminOrderCreation\AdminOrderCreation;
 use AdminOrderCreation\Form\OrderCreateForm;
 use AdminOrderCreation\Util\Calc;
+use AdminOrderCreation\Util\OrderStatusUpdater;
 use AdminOrderCreation\Util\CriteriaSearchTrait;
 use CreditNote\Model\CreditNote;
 use CreditNote\Model\CreditNoteAddress;
@@ -30,8 +31,6 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Thelia\Controller\Admin\BaseAdminController;
-use Thelia\Core\Event\Order\OrderEvent;
-use Thelia\Core\Event\TheliaEvents;
 use Thelia\Core\HttpFoundation\Request;
 use Thelia\Core\Security\AccessManager;
 use Thelia\Core\Security\Exception\TokenAuthenticationException;
@@ -151,17 +150,9 @@ class OrderController extends BaseAdminController
 
                 if ((int) $orderStatusId >= 2) {
                     if ((int) AdminOrderCreation::getConfigValue(AdminOrderCreation::CONFIG_KEY_INVOICE_REF_TYPE) === 0) {
-                        // pour retirer les stocks et générer la référence facture
-                        $order->setOrderStatus(
-                            OrderStatusQuery::create()->findOneById(2)
-                        );
-
-                        $eventDispatcher->dispatch(
-                            (new OrderEvent($order))->setStatus(2),
-                            TheliaEvents::ORDER_UPDATE_STATUS
-                        );
-
-                        $order->save();
+                        // pour retirer les stocks et générer la référence facture : l'événement part du statut
+                        // courant, c'est le cœur qui pose le nouveau statut (sinon il ne voit aucun changement)
+                        (new OrderStatusUpdater($eventDispatcher))->update($order, 2);
                     } else { // dans le cas d'une facturation à par
                         $order->setInvoiceRef((int) AdminOrderCreation::getConfigValue(AdminOrderCreation::CONFIG_KEY_INVOICE_REF_INCREMENT));
 
@@ -178,13 +169,7 @@ class OrderController extends BaseAdminController
                 }
 
                 if ((int) $orderStatusId > 2) {
-                    $order->setOrderStatus(
-                        OrderStatusQuery::create()->findOneById((int) $orderStatusId)
-                    );
-                    $eventDispatcher->dispatch(
-                        (new OrderEvent($order))->setStatus((int) $orderStatusId),
-                        TheliaEvents::ORDER_UPDATE_STATUS
-                    );
+                    (new OrderStatusUpdater($eventDispatcher))->update($order, (int) $orderStatusId);
                 }
 
                 $order->save();
@@ -234,11 +219,19 @@ class OrderController extends BaseAdminController
      */
     protected function useTwigBackOffice(): bool
     {
-        $adminTemplatePath = $this->templateHelper->getActiveAdminTemplate()->getAbsolutePath();
+        $adminTemplate = $this->templateHelper->getActiveAdminTemplate();
 
         foreach ($this->parserResolver->getParsers() as $parser) {
             if ('html.twig' === $parser->getFileExtension()) {
-                return $parser->supportTemplateRender($adminTemplatePath, 'base');
+                if (!$parser->supportTemplateRender($adminTemplate->getAbsolutePath(), 'base')) {
+                    return false;
+                }
+
+                // The fragment is rendered by Twig directly, not by BaseAdminController::render(): without a template
+                // definition on the parser, hook() dispatches "hook..<name>" and no module hook is ever called.
+                $parser->setTemplateDefinition($adminTemplate);
+
+                return true;
             }
         }
 
