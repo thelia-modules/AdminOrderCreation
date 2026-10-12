@@ -10,6 +10,7 @@ namespace AdminOrderCreation;
 
 use Propel\Runtime\Connection\ConnectionInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
+use Thelia\Core\Template\TemplateDefinition;
 use Thelia\Model\ModuleQuery;
 use Thelia\Module\BaseModule;
 
@@ -28,6 +29,23 @@ class AdminOrderCreation extends BaseModule
     const CONFIG_DEFAULT_VALUE_DEFAULT_NEW_CREDIT_NOTE_TYPE_ID = 7;
     const CONFIG_DEFAULT_VALUE_PAYED_ORDER_MINIMUM_STATUS_ID = 2;
     const CONFIG_DEFAULT_VALUE_INVOICE_REF_TYPE = 0;
+
+    public function getHooks(): array
+    {
+        return [
+            [
+                'type' => TemplateDefinition::BACK_OFFICE,
+                'code' => 'admin-order-creation.modal-options',
+                'title' => [
+                    'fr_FR' => 'Création de commande, champs supplémentaires de la fenêtre',
+                    'en_US' => 'Order creation, extra fields of the modal',
+                ],
+                'active' => true,
+                'block' => false,
+                'module' => false,
+            ],
+        ];
+    }
 
     public function update($currentVersion, $newVersion, ConnectionInterface $con = null): void
     {
