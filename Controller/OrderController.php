@@ -901,7 +901,7 @@ class OrderController extends BaseAdminController
                     ->setParentId($creditNote->getId())
                     ->setOrderId($order->getId());
 
-                    $newCreditNote->save();
+                $newCreditNote->save();
             } else { // cas crédit note égale
                 $orderCreditNote->setAmountPrice($creditNote->getTotalPriceWithTax());
             }
