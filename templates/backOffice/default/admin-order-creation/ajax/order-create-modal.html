@@ -4,6 +4,7 @@
     {form_field field='action'}
         <input type="hidden" name="{$name}" value="create" />
     {/form_field}
+    <input type="hidden" name="_token" value="{$csrfToken}" />
 
     {if $form_error}<div class="alert alert-danger">{$form_error_message nofilter}</div>{/if}
 

@@ -3,6 +3,7 @@
 <form method="POST" action="{{ path('admin_order_creation_ajax_create') }}">
 
     <input type="hidden" name="admin-order-creation-create[action]" value="create" />
+    <input type="hidden" name="_token" value="{{ csrfToken }}" />
 
     {% if errorMessages|length > 0 %}
         <div class="alert alert-danger">

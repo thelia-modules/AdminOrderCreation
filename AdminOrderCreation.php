@@ -47,7 +47,20 @@ class AdminOrderCreation extends BaseModule
         ];
     }
 
-    public function update($currentVersion, $newVersion, ConnectionInterface $con = null): void
+    public function postActivation(?ConnectionInterface $con = null): void
+    {
+        $this->initializeDefaultConfiguration();
+    }
+
+    public function update($currentVersion, $newVersion, ?ConnectionInterface $con = null): void
+    {
+        $this->initializeDefaultConfiguration();
+    }
+
+    /**
+     * Every key keeps the value a merchant already set; only the missing ones get their default.
+     */
+    private function initializeDefaultConfiguration(): void
     {
         if (null === self::getConfigValue(self::CONFIG_KEY_DEFAULT_NEW_CREDIT_NOTE_STATUS_ID)) {
             self::setConfigValue(
@@ -88,7 +101,7 @@ class AdminOrderCreation extends BaseModule
     public static function configureServices(ServicesConfigurator $servicesConfigurator): void
     {
         $servicesConfigurator->load(self::getModuleCode().'\\', __DIR__)
-            ->exclude([__DIR__.'/I18n/*', __DIR__.'/tests/*', __DIR__.'/vendor/*'])
+            ->exclude([__DIR__.'/I18n/*', __DIR__.'/tests/*', __DIR__.'/Tests/*', __DIR__.'/vendor/*'])
             ->autowire(true)
             ->autoconfigure(true);
     }
