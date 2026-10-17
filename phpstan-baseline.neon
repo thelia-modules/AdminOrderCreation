@@ -1,0 +1,17 @@
+# The CreditNote module is optional (composer "suggest"); every use of its classes sits behind
+# class_exists() / hasCreditNoteModule(). The published shop analysed here does not install it.
+parameters:
+    reportUnmatchedIgnoredErrors: false
+    ignoreErrors:
+        -
+            message: '#^Call to static method (create|findNextCreditNoteUsedStatus)\(\) on an unknown class CreditNote\\Model\\(CreditNoteQuery|CreditNoteStatusQuery|CreditNoteTypeQuery)\.$#'
+            count: 5
+            path: Controller/OrderController.php
+        -
+            message: '#^Instantiated class CreditNote\\Model\\(OrderCreditNote|CreditNoteAddress|CreditNoteDetail|CreditNote) not found\.$#'
+            count: 4
+            path: Controller/OrderController.php
+        -
+            message: '#^Call to static method create\(\) on an unknown class CreditNote\\Model\\CreditNoteQuery\.$#'
+            count: 1
+            path: Hook/Back/OrderEditHook.php
